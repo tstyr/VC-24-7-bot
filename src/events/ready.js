@@ -23,14 +23,16 @@ export async function execute(client) {
         const channel = await client.channels.fetch(vcChannelId);
         if (channel?.isVoiceBased()) {
           const node = client.musicPlayer.shoukaku.nodes.get('main');
-          if (node) {
-            await node.joinChannel({
-              guildId: channel.guildId,
-              channelId: channel.id,
-              shardId: 0
-            });
-            log(`24時間VC接続: ${channel.name}`, 'voice');
+          if (!node) {
+            log('Lavalinkノード "main" が見つかりません', 'error');
+            return;
           }
+          await node.joinVoiceChannel({
+            guildId: channel.guildId,
+            channelId: channel.id,
+            shardId: 0
+          });
+          log(`24時間VC接続: ${channel.name}`, 'voice');
         }
       } catch (error) {
         log(`24時間VC接続エラー: ${error.message}`, 'error');

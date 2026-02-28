@@ -40,7 +40,7 @@ export async function execute(interaction, musicPlayer) {
     }
 
     // 新しいチャンネルに接続
-    queue.player = await node.joinChannel({
+    queue.player = await node.joinVoiceChannel({
       guildId: interaction.guildId,
       channelId: targetChannel.id,
       shardId: 0

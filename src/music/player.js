@@ -106,7 +106,7 @@ export class MusicPlayer {
     try {
       if (!queue.player) {
         const node = this.shoukaku.nodes.get('main');
-        queue.player = await node.joinChannel({
+        queue.player = await node.joinVoiceChannel({
           guildId,
           channelId: voiceChannelId,
           shardId: 0
