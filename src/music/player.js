@@ -55,7 +55,7 @@ export class MusicPlayer {
 
   async search(query) {
     try {
-      const node = this.shoukaku.getNode('main');
+      const node = this.shoukaku.nodes.get('main');
       if (!node) throw new Error('Lavalinkノードが利用できません');
 
       // URLの場合はそのまま、それ以外はYouTube検索
@@ -105,7 +105,7 @@ export class MusicPlayer {
 
     try {
       if (!queue.player) {
-        const node = this.shoukaku.getNode('main');
+        const node = this.shoukaku.nodes.get('main');
         queue.player = await node.joinChannel({
           guildId,
           channelId: voiceChannelId,
