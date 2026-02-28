@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, Collection } from 'discord.js';
 import { config } from 'dotenv';
+import { createServer } from 'http';
 import { MusicPlayer } from './music/player.js';
 import { testConnection } from './database/db.js';
 import { log } from './utils/logger.js';
@@ -54,7 +55,7 @@ client.musicPlayer.shoukaku.on('ready', () => {
 });
 
 // イベントハンドラー
-client.once(readyEvent.name, (...args) => readyEvent.execute(...args, client));
+client.once('ready', (...args) => readyEvent.execute(...args, client));
 client.on(voiceStateUpdateEvent.name, voiceStateUpdateEvent.execute);
 client.on(interactionCreateEvent.name, (...args) => interactionCreateEvent.execute(...args, client));
 
@@ -70,6 +71,22 @@ process.on('unhandledRejection', (error) => {
 process.on('uncaughtException', (error) => {
   log(`未処理の例外: ${error.message}`, 'error');
   process.exit(1);
+});
+
+// ヘルスチェック用HTTPサーバー（Koyeb用）
+const server = createServer((req, res) => {
+  if (req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+});
+
+const PORT = process.env.PORT || 8000;
+server.listen(PORT, () => {
+  log(`ヘルスチェックサーバー起動: ポート ${PORT}`, 'success');
 });
 
 // 起動

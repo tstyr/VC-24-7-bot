@@ -26,7 +26,7 @@ export async function execute(interaction, musicPlayer) {
   }
 
   try {
-    const node = musicPlayer.shoukaku.getNode();
+    const node = musicPlayer.shoukaku.getNode('main');
     if (!node) {
       return interaction.editReply('❌ Lavalinkノードが利用できません');
     }
