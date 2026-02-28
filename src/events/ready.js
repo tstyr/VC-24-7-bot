@@ -40,6 +40,7 @@ export async function execute(client) {
 
           const queue = client.musicPlayer.getQueue(channel.guildId);
           queue.player = player;
+          queue.voiceChannelId = channel.id;
 
           // 保存された音量を適用
           await client.musicPlayer.applySavedVolume(player, channel.guildId);

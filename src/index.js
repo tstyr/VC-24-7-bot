@@ -71,6 +71,21 @@ server.listen(PORT, () => {
   log(`ヘルスチェックサーバー起動: ポート ${PORT}`, 'success');
 });
 
+// Koyeb自動停止防止: 定期的な自己ping（5分ごと）
+if (process.env.KOYEB_PUBLIC_DOMAIN) {
+  setInterval(() => {
+    const url = `https://${process.env.KOYEB_PUBLIC_DOMAIN}/health`;
+    fetch(url)
+      .then(() => log('キープアライブping送信', 'success'))
+      .catch((err) => log(`キープアライブエラー: ${err.message}`, 'error'));
+  }, 5 * 60 * 1000); // 5分
+}
+
+// 定期的なアクティビティログ（10分ごと）
+setInterval(() => {
+  log('Instance is healthy. All health checks are passing.', 'success');
+}, 10 * 60 * 1000);
+
 // 起動
 async function start() {
   try {

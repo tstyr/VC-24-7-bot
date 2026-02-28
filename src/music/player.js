@@ -50,7 +50,8 @@ export class MusicPlayer {
         textChannel: null,
         controlMessage: null,
         progressInterval: null,
-        skipRequested: false
+        skipRequested: false,
+        voiceChannelId: null
       });
     }
     return this.queues.get(guildId);
@@ -198,6 +199,11 @@ export class MusicPlayer {
   async play(guildId, voiceChannelId) {
     const queue = this.getQueue(guildId);
     
+    // voiceChannelIdを保存
+    if (voiceChannelId) {
+      queue.voiceChannelId = voiceChannelId;
+    }
+    
     if (queue.tracks.length === 0) {
       log('キューが空です - 常時接続を維持', 'music');
       
@@ -217,12 +223,12 @@ export class MusicPlayer {
 
     try {
       if (!queue.player) {
-        log(`プレイヤー作成開始: guildId=${guildId}, channelId=${voiceChannelId}`, 'music');
+        log(`プレイヤー作成開始: guildId=${guildId}, channelId=${queue.voiceChannelId}`, 'music');
 
         // Shoukaku v4: shoukaku インスタンスから joinVoiceChannel を呼び出す
         queue.player = await this.shoukaku.joinVoiceChannel({
           guildId: guildId,
-          channelId: voiceChannelId,
+          channelId: queue.voiceChannelId,
           shardId: 0,
           deaf: true,
         });
@@ -266,7 +272,7 @@ export class MusicPlayer {
           // 次の曲を再生
           if (queue.tracks.length > 0) {
             log(`次の曲を再生: キュー残り${queue.tracks.length}曲`, 'music');
-            await this.play(guildId, queue.player.connection.channelId);
+            await this.play(guildId, queue.voiceChannelId);
           } else {
             log('キューが空になりました', 'music');
           }
@@ -292,7 +298,7 @@ export class MusicPlayer {
           // 次の曲を再生
           if (queue.tracks.length > 0) {
             log(`エラー後に次の曲を再生: キュー残り${queue.tracks.length}曲`, 'music');
-            await this.play(guildId, queue.player.connection.channelId);
+            await this.play(guildId, queue.voiceChannelId);
           } else {
             log('エラー後、キューが空になりました', 'music');
           }
