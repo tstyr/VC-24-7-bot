@@ -73,26 +73,45 @@ export class MusicPlayer {
       log(`Lavalink検索実行: ${searchQuery}`, 'music');
       const result = await node.rest.resolve(searchQuery);
 
-      // 結果の検証
+      log(`検索結果の型: ${typeof result}`, 'music');
+      log(`検索結果: ${JSON.stringify(result)}`, 'music');
+
+      // Lavalink v4 のレスポンス形式に対応
+      let tracks = [];
+      
       if (!result) {
         log('検索結果がnullです', 'error');
         return { success: false, tracks: [], error: '検索結果が取得できませんでした' };
       }
 
-      if (!result.tracks || !Array.isArray(result.tracks)) {
-        log('result.tracksが存在しないか配列ではありません', 'error');
-        return { success: false, tracks: [], error: '検索結果の形式が不正です' };
+      // Lavalink v4 では loadType と data を持つ
+      if (result.loadType === 'search' || result.loadType === 'track' || result.loadType === 'playlist') {
+        if (result.data) {
+          if (Array.isArray(result.data)) {
+            tracks = result.data;
+          } else if (result.data.tracks && Array.isArray(result.data.tracks)) {
+            tracks = result.data.tracks;
+          } else if (result.data.encoded) {
+            // 単一トラック
+            tracks = [result.data];
+          }
+        }
+      } else if (Array.isArray(result.tracks)) {
+        // 旧形式（Lavalink v3）
+        tracks = result.tracks;
+      } else if (Array.isArray(result)) {
+        tracks = result;
       }
 
-      if (result.tracks.length === 0) {
+      if (tracks.length === 0) {
         log('検索結果が0件です', 'music');
         return { success: false, tracks: [], error: '検索結果が見つかりませんでした' };
       }
 
-      log(`検索成功: ${result.tracks.length}件`, 'music');
+      log(`検索成功: ${tracks.length}件`, 'music');
       return { 
         success: true, 
-        tracks: result.tracks.slice(0, 15)
+        tracks: tracks.slice(0, 15)
       };
     } catch (error) {
       log(`検索エラー: ${error.message}`, 'error');
@@ -116,11 +135,19 @@ export class MusicPlayer {
           throw new Error('Lavalinkノードが利用できません');
         }
 
-        // Shoukaku v4 では自動的に接続を検出
-        queue.player = node.players.get(guildId) || await node.createPlayer({
-          guildId,
-          voiceChannelId,
-        });
+        // Shoukaku v4 では joinVoiceChannel で接続してから player を取得
+        // すでに @discordjs/voice で接続済みの場合は player のみ作成
+        const existingPlayer = node.players.get(guildId);
+        if (existingPlayer) {
+          queue.player = existingPlayer;
+        } else {
+          // 新しいプレイヤーを作成（接続は @discordjs/voice が管理）
+          queue.player = await node.joinChannel({
+            guildId,
+            channelId: voiceChannelId,
+            shardId: 0,
+          });
+        }
 
         queue.player.on('end', () => {
           if (queue.repeat && queue.current) {
@@ -138,11 +165,16 @@ export class MusicPlayer {
       }
 
       queue.current = queue.tracks.shift();
-      await queue.player.playTrack({ track: { encoded: queue.current.encoded } });
+      
+      // Lavalink v4 形式に対応
+      const trackData = queue.current.encoded || queue.current.track;
+      await queue.player.playTrack({ track: trackData });
+      
       log(`再生開始: ${queue.current.info.title}`, 'music');
 
     } catch (error) {
       log(`再生エラー: ${error.message}`, 'error');
+      throw error;
     }
   }
 

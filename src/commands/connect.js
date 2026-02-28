@@ -54,10 +54,11 @@ export async function execute(interaction, musicPlayer) {
 
     queue.voiceConnection = voiceConnection;
 
-    // Shoukaku v4 では自動的に接続を検出するため、player作成のみ
-    queue.player = node.players.get(interaction.guildId) || await node.createPlayer({
+    // Shoukaku player を作成
+    queue.player = await node.joinChannel({
       guildId: interaction.guildId,
-      voiceChannelId: targetChannel.id,
+      channelId: targetChannel.id,
+      shardId: 0,
     });
 
     log(`${targetChannel.name} に接続しました`, 'voice');

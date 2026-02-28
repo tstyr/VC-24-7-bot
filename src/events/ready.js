@@ -38,10 +38,11 @@ export async function execute(client) {
             selfMute: false,
           });
 
-          // Shoukaku v4 では自動的に接続を検出するため、player作成のみ
-          const player = node.players.get(channel.guildId) || await node.createPlayer({
+          // Shoukaku player を作成
+          const player = await node.joinChannel({
             guildId: channel.guildId,
-            voiceChannelId: channel.id,
+            channelId: channel.id,
+            shardId: 0,
           });
 
           const queue = client.musicPlayer.getQueue(channel.guildId);
@@ -52,6 +53,7 @@ export async function execute(client) {
         }
       } catch (error) {
         log(`24時間VC接続エラー: ${error.message}`, 'error');
+        log(`エラースタック: ${error.stack}`, 'error');
       }
     }
   });
