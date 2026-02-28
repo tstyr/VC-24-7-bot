@@ -49,7 +49,8 @@ export class MusicPlayer {
         player: null,
         textChannel: null,
         controlMessage: null,
-        progressInterval: null
+        progressInterval: null,
+        skipRequested: false
       });
     }
     return this.queues.get(guildId);
@@ -234,23 +235,29 @@ export class MusicPlayer {
           // REPLACED イベントは無視（次の曲が既にキューに入っている場合）
           if (data.reason === 'REPLACED') return;
           
-          log(`曲終了: reason=${data.reason}`, 'music');
+          log(`曲終了: reason=${data.reason}, skipRequested=${queue.skipRequested}`, 'music');
           
           // プログレスバーを停止
           this.stopProgressBar(guildId);
           
-          if (queue.repeat && queue.current) {
+          // 古いパネルを削除
+          if (queue.controlMessage) {
+            await queue.controlMessage.delete().catch(() => {});
+            queue.controlMessage = null;
+          }
+          
+          // スキップが要求されていない場合のみリピート処理
+          if (queue.repeat && queue.current && !queue.skipRequested) {
             queue.tracks.unshift(queue.current);
           }
+          
+          // スキップフラグをリセット
+          queue.skipRequested = false;
           queue.current = null;
           
           // 次の曲を再生
           if (queue.tracks.length > 0) {
             await this.play(guildId, queue.player.connection.channelId);
-          } else if (queue.controlMessage) {
-            // キューが空になったらパネルを削除
-            queue.controlMessage.delete().catch(() => {});
-            queue.controlMessage = null;
           }
         });
 
@@ -259,6 +266,12 @@ export class MusicPlayer {
           
           // プログレスバーを停止
           this.stopProgressBar(guildId);
+          
+          // 古いパネルを削除
+          if (queue.controlMessage) {
+            await queue.controlMessage.delete().catch(() => {});
+            queue.controlMessage = null;
+          }
           
           queue.current = null;
           
@@ -325,6 +338,9 @@ export class MusicPlayer {
     if (queue.player) {
       // プログレスバーを停止
       this.stopProgressBar(guildId);
+      
+      // スキップフラグを立てる（リピートを一時的に無効化）
+      queue.skipRequested = true;
       
       queue.player.stopTrack();
       log('スキップ実行 - end イベントが発火してキュー進行', 'music');

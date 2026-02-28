@@ -19,7 +19,7 @@ export function createMusicPanel(track, queue) {
   const embed = new EmbedBuilder()
     .setColor('#2b2d31') // Discordモダンダーク
     .setAuthor({ 
-      name: 'Now Playing', 
+      name: '🎵 Now Playing', 
       iconURL: 'https://cdn-icons-png.flaticon.com/512/1384/1384061.png' 
     })
     .setTitle(track.info.title)
@@ -34,23 +34,27 @@ export function createMusicPanel(track, queue) {
       'https://images.unsplash.com/photo-1614680376573-df3480f0c6ff?q=80&w=200&auto=format&fit=crop'
     )
     .addFields(
-      { name: '待機中のキュー', value: `${queue.tracks.length} 曲`, inline: true },
-      { name: 'リピート', value: queue.repeat ? '🟢 ON' : '⚫ OFF', inline: true }
+      { name: '📋 待機中のキュー', value: `${queue.tracks.length} 曲`, inline: true },
+      { name: '🔁 リピート', value: queue.repeat ? '`ON`' : '`OFF`', inline: true }
     )
-    .setFooter({ text: 'Music Player v2' });
+    .setFooter({ text: 'Music Player v2 • Powered by Lavalink' })
+    .setTimestamp();
 
   const row = new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
         .setCustomId('music_pause')
+        .setLabel('一時停止')
         .setEmoji('⏯️')
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId('music_skip')
+        .setLabel('スキップ')
         .setEmoji('⏭️')
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId('music_repeat')
+        .setLabel(queue.repeat ? 'リピートON' : 'リピートOFF')
         .setEmoji('🔁')
         .setStyle(queue.repeat ? ButtonStyle.Success : ButtonStyle.Secondary)
     );
