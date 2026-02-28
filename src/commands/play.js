@@ -23,8 +23,8 @@ export async function execute(interaction, musicPlayer) {
   log(`検索開始: ${query}`, 'music');
   const result = await musicPlayer.search(query);
 
-  if (!result.success || result.tracks.length === 0) {
-    return interaction.editReply('❌ 曲が見つかりませんでした');
+  if (!result.success || !result.tracks || result.tracks.length === 0) {
+    return interaction.editReply('❌ 曲が見つかりませんでした。別のキーワードで試してください。');
   }
 
   // URLの場合は直接再生

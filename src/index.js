@@ -10,6 +10,8 @@ import * as readyEvent from './events/ready.js';
 import * as voiceStateUpdateEvent from './events/voiceStateUpdate.js';
 import * as interactionCreateEvent from './events/interactionCreate.js';
 import * as playCommand from './commands/play.js';
+import * as connectCommand from './commands/connect.js';
+import * as disconnectCommand from './commands/disconnect.js';
 
 config();
 
@@ -25,6 +27,8 @@ const client = new Client({
 // コマンドとイベントの登録
 client.commands = new Collection();
 client.commands.set(playCommand.data.name, playCommand);
+client.commands.set(connectCommand.data.name, connectCommand);
+client.commands.set(disconnectCommand.data.name, disconnectCommand);
 
 // 音楽プレイヤー初期化
 client.musicPlayer = new MusicPlayer(client);

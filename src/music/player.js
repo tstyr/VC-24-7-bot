@@ -58,13 +58,33 @@ export class MusicPlayer {
       const node = this.shoukaku.getNode();
       if (!node) throw new Error('Lavalinkノードが利用できません');
 
-      const searchQuery = query.startsWith('http') ? query : `ytsearch:${query}`;
+      // URLの場合はそのまま、それ以外はYouTube検索
+      let searchQuery;
+      if (query.startsWith('http://') || query.startsWith('https://')) {
+        searchQuery = query;
+      } else {
+        searchQuery = `ytsearch:${query}`;
+      }
+
       const result = await node.rest.resolve(searchQuery);
 
-      if (!result || !result.tracks || result.tracks.length === 0) {
+      // 結果の検証
+      if (!result) {
+        log('検索結果がnullです', 'error');
         return { success: false, tracks: [] };
       }
 
+      if (!result.tracks) {
+        log('result.tracksが存在しません', 'error');
+        return { success: false, tracks: [] };
+      }
+
+      if (result.tracks.length === 0) {
+        log('検索結果が0件です', 'music');
+        return { success: false, tracks: [] };
+      }
+
+      log(`検索成功: ${result.tracks.length}件`, 'music');
       return { 
         success: true, 
         tracks: result.tracks.slice(0, 15)
