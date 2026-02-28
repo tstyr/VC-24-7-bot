@@ -34,13 +34,14 @@ export async function execute(client) {
             channelId: channel.id,
             guildId: channel.guildId,
             adapterCreator: channel.guild.voiceAdapterCreator,
+            selfDeaf: false,
+            selfMute: false,
           });
 
-          // Shoukaku player を作成
-          const player = await node.joinChannel({
+          // Shoukaku v4 では自動的に接続を検出するため、player作成のみ
+          const player = node.players.get(channel.guildId) || await node.createPlayer({
             guildId: channel.guildId,
-            channelId: channel.id,
-            shardId: 0,
+            voiceChannelId: channel.id,
           });
 
           const queue = client.musicPlayer.getQueue(channel.guildId);

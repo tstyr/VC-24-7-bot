@@ -111,10 +111,10 @@ export class MusicPlayer {
           throw new Error('Lavalinkノードが利用できません');
         }
 
-        queue.player = await node.joinChannel({
+        // Shoukaku v4 では自動的に接続を検出
+        queue.player = node.players.get(guildId) || await node.createPlayer({
           guildId,
-          channelId: voiceChannelId,
-          shardId: 0,
+          voiceChannelId,
         });
 
         queue.player.on('end', () => {
