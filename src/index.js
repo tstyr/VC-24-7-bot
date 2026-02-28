@@ -51,8 +51,8 @@ client.musicPlayer.shoukaku.on('ready', () => {
           await queue.controlMessage.delete().catch(() => {});
         }
         
-        // 新しいパネルを送信
-        const panel = createMusicPanel(queue.current, queue);
+        // 新しいパネルを送信（player を渡す）
+        const panel = createMusicPanel(queue.current, queue, queue.player);
         const message = await queue.textChannel.send(panel);
         queue.controlMessage = message;
       } catch (error) {

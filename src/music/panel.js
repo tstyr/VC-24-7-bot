@@ -1,6 +1,15 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
-export function createMusicPanel(track, queue) {
+export function createProgressBar(current, total, length = 15) {
+  if (!total || total === 0) return '▬'.repeat(length);
+  const progress = Math.round((current / total) * length);
+  const emptyProgress = length - progress;
+  const progressText = '▇'.repeat(Math.max(0, progress - 1));
+  const emptyProgressText = '▬'.repeat(Math.max(0, emptyProgress));
+  return `[${progressText}🔘${emptyProgressText}]`;
+}
+
+export function createMusicPanel(track, queue, player = null) {
   const embed = new EmbedBuilder()
     .setColor('#5865F2')
     .setTitle('🎵 再生中')
@@ -9,7 +18,21 @@ export function createMusicPanel(track, queue) {
       { name: '作者', value: track.info.author || '不明', inline: true },
       { name: '長さ', value: formatDuration(track.info.length), inline: true },
       { name: 'リピート', value: queue.repeat ? '🔁 ON' : '➡️ OFF', inline: true }
-    )
+    );
+
+  // プログレスバーを追加
+  if (player && player.position !== undefined) {
+    const progressBar = createProgressBar(player.position, track.info.length);
+    const currentTime = formatDuration(player.position);
+    const totalTime = formatDuration(track.info.length);
+    embed.addFields({
+      name: '再生位置',
+      value: `${currentTime} ${progressBar} ${totalTime}`,
+      inline: false
+    });
+  }
+
+  embed
     .setThumbnail(track.info.artworkUrl || null)
     .setFooter({ text: `キュー: ${queue.tracks.length}曲` })
     .setTimestamp();

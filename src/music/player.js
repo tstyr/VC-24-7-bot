@@ -48,7 +48,8 @@ export class MusicPlayer {
         repeat: false,
         player: null,
         textChannel: null,
-        controlMessage: null
+        controlMessage: null,
+        progressInterval: null
       });
     }
     return this.queues.get(guildId);
@@ -62,6 +63,39 @@ export class MusicPlayer {
       log(`音量適用: ${vol}% (Guild: ${guildId})`, 'music');
     } catch (error) {
       log(`音量適用エラー: ${error.message}`, 'error');
+    }
+  }
+
+  startProgressBar(guildId) {
+    const queue = this.getQueue(guildId);
+    
+    // 既存のインターバルをクリア
+    this.stopProgressBar(guildId);
+    
+    // 5秒おきにプログレスバーを更新（API制限回避）
+    queue.progressInterval = setInterval(async () => {
+      try {
+        if (queue.player && queue.current && queue.controlMessage) {
+          const { createMusicPanel } = await import('./panel.js');
+          const panel = createMusicPanel(queue.current, queue, queue.player);
+          await queue.controlMessage.edit(panel);
+        }
+      } catch (error) {
+        log(`プログレスバー更新エラー: ${error.message}`, 'error');
+        this.stopProgressBar(guildId);
+      }
+    }, 5000);
+    
+    log(`プログレスバー開始: Guild ${guildId}`, 'music');
+  }
+
+  stopProgressBar(guildId) {
+    const queue = this.getQueue(guildId);
+    
+    if (queue.progressInterval) {
+      clearInterval(queue.progressInterval);
+      queue.progressInterval = null;
+      log(`プログレスバー停止: Guild ${guildId}`, 'music');
     }
   }
 
@@ -156,7 +190,10 @@ export class MusicPlayer {
     const queue = this.getQueue(guildId);
     
     if (queue.tracks.length === 0) {
-      log('キューが空です', 'music');
+      log('キューが空です - 常時接続を維持', 'music');
+      
+      // プログレスバーを停止
+      this.stopProgressBar(guildId);
       
       // リモコンパネルを削除
       if (queue.controlMessage) {
@@ -164,6 +201,8 @@ export class MusicPlayer {
         queue.controlMessage = null;
       }
       
+      // 常時接続を維持するため、プレイヤーは切断しない
+      queue.current = null;
       return;
     }
 
@@ -195,15 +234,26 @@ export class MusicPlayer {
           // REPLACED イベントは無視（次の曲が既にキューに入っている場合）
           if (data.reason === 'REPLACED') return;
           
+          log(`曲終了: reason=${data.reason}`, 'music');
+          
+          // プログレスバーを停止
+          this.stopProgressBar(guildId);
+          
           if (queue.repeat && queue.current) {
             queue.tracks.unshift(queue.current);
           }
           queue.current = null;
+          
+          // 次の曲を再生（キューが空でも常時接続を維持）
           this.play(guildId, queue.player.connection.channelId);
         });
 
         queue.player.on('exception', (error) => {
           log(`再生エラー: ${error.exception?.message}`, 'error');
+          
+          // プログレスバーを停止
+          this.stopProgressBar(guildId);
+          
           queue.current = null;
           this.play(guildId, queue.player.connection.channelId);
         });
@@ -229,6 +279,9 @@ export class MusicPlayer {
       });
       
       log(`再生開始成功: ${queue.current.info?.title || 'Unknown'}`, 'music');
+      
+      // プログレスバーを開始
+      this.startProgressBar(guildId);
 
     } catch (error) {
       log(`再生エラー: ${error.message}`, 'error');
@@ -239,6 +292,9 @@ export class MusicPlayer {
         log(`RestError body: ${JSON.stringify(error.body)}`, 'error');
       }
       
+      // プログレスバーを停止
+      this.stopProgressBar(guildId);
+      
       throw error;
     }
   }
@@ -246,7 +302,11 @@ export class MusicPlayer {
   async skip(guildId) {
     const queue = this.getQueue(guildId);
     if (queue.player) {
+      // プログレスバーを停止
+      this.stopProgressBar(guildId);
+      
       queue.player.stopTrack();
+      log('スキップ実行 - end イベントが発火してキュー進行', 'music');
       return true;
     }
     return false;
