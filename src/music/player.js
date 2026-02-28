@@ -157,6 +157,13 @@ export class MusicPlayer {
     
     if (queue.tracks.length === 0) {
       log('キューが空です', 'music');
+      
+      // リモコンパネルを削除
+      if (queue.controlMessage) {
+        queue.controlMessage.delete().catch(() => {});
+        queue.controlMessage = null;
+      }
+      
       return;
     }
 
@@ -180,19 +187,25 @@ export class MusicPlayer {
 
         // 保存された音量を適用
         await this.applySavedVolume(queue.player, guildId);
+      }
 
-        queue.player.on('end', () => {
+      // イベントリスナーの重複登録を防止
+      if (queue.player.listeners('end').length === 0) {
+        queue.player.on('end', (data) => {
+          // REPLACED イベントは無視（次の曲が既にキューに入っている場合）
+          if (data.reason === 'REPLACED') return;
+          
           if (queue.repeat && queue.current) {
             queue.tracks.unshift(queue.current);
           }
           queue.current = null;
-          this.play(guildId, voiceChannelId);
+          this.play(guildId, queue.player.connection.channelId);
         });
 
         queue.player.on('exception', (error) => {
           log(`再生エラー: ${error.exception?.message}`, 'error');
           queue.current = null;
-          this.play(guildId, voiceChannelId);
+          this.play(guildId, queue.player.connection.channelId);
         });
       }
 

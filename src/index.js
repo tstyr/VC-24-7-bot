@@ -46,6 +46,12 @@ client.musicPlayer.shoukaku.on('ready', () => {
     const queue = this.getQueue(guildId);
     if (queue.current && queue.textChannel) {
       try {
+        // 古いパネルを削除
+        if (queue.controlMessage) {
+          await queue.controlMessage.delete().catch(() => {});
+        }
+        
+        // 新しいパネルを送信
         const panel = createMusicPanel(queue.current, queue);
         const message = await queue.textChannel.send(panel);
         queue.controlMessage = message;
