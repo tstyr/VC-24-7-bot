@@ -162,8 +162,8 @@ export class MusicPlayer {
 
         log('Shoukaku プレイヤー作成成功', 'music');
 
-        // 接続が安定するまで待機
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // 接続が安定するまで待機（500ms）
+        await new Promise(resolve => setTimeout(resolve, 500));
         log('接続安定化待機完了', 'music');
 
         queue.player.on('end', () => {
@@ -184,20 +184,21 @@ export class MusicPlayer {
       queue.current = queue.tracks.shift();
       
       // Lavalink v4 形式: encoded フィールドを確実に取得
-      let trackData;
-      if (queue.current.encoded) {
-        trackData = queue.current.encoded;
-      } else if (queue.current.track) {
-        trackData = queue.current.track;
-      } else {
+      const encodedTrack = queue.current.encoded || queue.current.track;
+      
+      if (!encodedTrack) {
         throw new Error('トラックデータが見つかりません');
       }
       
       log(`再生開始試行: ${queue.current.info?.title || 'Unknown'}`, 'music');
-      log(`トラックデータ長: ${trackData.length}文字`, 'music');
+      log(`トラックデータ長: ${encodedTrack.length}文字`, 'music');
       
-      // Shoukaku v4: playTrack に正しいオブジェクト形式で渡す
-      await queue.player.playTrack({ track: { encoded: trackData } });
+      // Shoukaku v4 + Lavalink v4: 厳密なJSON構造で渡す
+      await queue.player.playTrack({ 
+        track: { 
+          encoded: encodedTrack 
+        } 
+      });
       
       log(`再生開始成功: ${queue.current.info?.title || 'Unknown'}`, 'music');
 

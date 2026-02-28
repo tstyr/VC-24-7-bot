@@ -46,8 +46,8 @@ export async function execute(interaction, musicPlayer) {
 
     log('Shoukaku プレイヤー作成成功', 'voice');
 
-    // 接続が安定するまで待機
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // 接続が安定するまで待機（500ms）
+    await new Promise(resolve => setTimeout(resolve, 500));
     log('接続安定化待機完了', 'voice');
 
     log(`${targetChannel.name} に接続しました`, 'voice');

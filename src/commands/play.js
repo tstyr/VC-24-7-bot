@@ -111,6 +111,13 @@ export async function execute(interaction, musicPlayer) {
 
     collector.on('collect', async (i) => {
       try {
+        // 【最重要】真っ先に i.update を実行してタイムアウトを防止
+        await i.update({
+          content: '✅ キューに追加中...',
+          embeds: [],
+          components: []
+        });
+
         const trackIndex = parseInt(i.values[0].split('_')[1]);
         const selectedTrack = result.tracks[trackIndex];
 
@@ -118,8 +125,8 @@ export async function execute(interaction, musicPlayer) {
         queue.tracks.push(selectedTrack);
         queue.textChannel = interaction.channel;
 
-        // 先に update してから再生を開始
-        await i.update({
+        // 追加完了メッセージに更新
+        await interaction.editReply({
           content: `✅ キューに追加: **${selectedTrack.info?.title || 'Unknown'}**`,
           embeds: [],
           components: []
@@ -150,20 +157,13 @@ export async function execute(interaction, musicPlayer) {
         log(`選択処理エラー: ${error.message}`, 'error');
         log(`エラースタック: ${error.stack}`, 'error');
         
-        // インタラクションの状態を確認してから応答
+        // エラー時も適切に応答
         try {
-          if (!i.replied && !i.deferred) {
-            await i.reply({
-              content: '❌ 曲の追加中にエラーが発生しました',
-              flags: [MessageFlags.Ephemeral]
-            });
-          } else if (i.deferred) {
-            await i.editReply({
-              content: '❌ 曲の追加中にエラーが発生しました',
-              embeds: [],
-              components: []
-            });
-          }
+          await interaction.editReply({
+            content: '❌ 曲の追加中にエラーが発生しました',
+            embeds: [],
+            components: []
+          });
         } catch (updateError) {
           log(`update エラー: ${updateError.message}`, 'error');
         }
