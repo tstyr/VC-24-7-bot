@@ -11,7 +11,7 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction, musicPlayer) {
-  // 最優先で deferReply を実行
+  // 最優先で deferReply を実行（3秒ルールを守る）
   try {
     await interaction.deferReply();
   } catch (error) {
@@ -22,7 +22,7 @@ export async function execute(interaction, musicPlayer) {
   const query = interaction.options.getString('曲名');
   const member = interaction.member;
 
-  // ボイスチャンネルチェック
+  // ボイスチャンネルチェック（即座に実行）
   if (!member.voice.channel) {
     try {
       return await interaction.editReply('❌ ボイスチャンネルに参加してください');
@@ -35,16 +35,17 @@ export async function execute(interaction, musicPlayer) {
   try {
     log(`検索開始: ${query}`, 'music');
     
-    // タイムアウト付きで検索実行（30秒）
+    // タイムアウト付きで検索実行（28秒 - deferReplyの猶予を考慮）
     const searchPromise = musicPlayer.search(query);
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('検索がタイムアウトしました')), 30000)
+      setTimeout(() => reject(new Error('検索がタイムアウトしました')), 28000)
     );
     
     const result = await Promise.race([searchPromise, timeoutPromise]);
 
     if (!result.success || !result.tracks || result.tracks.length === 0) {
-      return await interaction.editReply('❌ 曲が見つかりませんでした。別のキーワードで試してください。');
+      const errorMsg = result.error || '曲が見つかりませんでした。別のキーワードで試してください。';
+      return await interaction.editReply(`❌ ${errorMsg}`);
     }
 
     // URLの場合は直接再生
@@ -54,16 +55,21 @@ export async function execute(interaction, musicPlayer) {
       queue.textChannel = interaction.channel;
 
       if (!queue.current) {
-        await musicPlayer.play(interaction.guildId, member.voice.channelId);
+        try {
+          await musicPlayer.play(interaction.guildId, member.voice.channelId);
+        } catch (playError) {
+          log(`再生エラー: ${playError.message}`, 'error');
+          return await interaction.editReply(`❌ 再生開始に失敗しました: ${playError.message}`);
+        }
       }
 
-      return await interaction.editReply(`✅ キューに追加: **${result.tracks[0].info.title}**`);
+      return await interaction.editReply(`✅ キューに追加: **${result.tracks[0].info?.title || 'Unknown'}**`);
     }
 
     // 検索結果をSelect Menuで表示
     const options = result.tracks.map((track, index) => ({
-      label: track.info.title.substring(0, 100),
-      description: `${track.info.author} - ${formatDuration(track.info.length)}`.substring(0, 100),
+      label: (track.info?.title || 'Unknown').substring(0, 100),
+      description: `${track.info?.author || 'Unknown'} - ${formatDuration(track.info?.length || 0)}`.substring(0, 100),
       value: `track_${index}`
     }));
 
@@ -102,7 +108,7 @@ export async function execute(interaction, musicPlayer) {
 
         // 先に update してから再生を開始
         await i.update({
-          content: `✅ キューに追加: **${selectedTrack.info.title}**`,
+          content: `✅ キューに追加: **${selectedTrack.info?.title || 'Unknown'}**`,
           embeds: [],
           components: []
         });

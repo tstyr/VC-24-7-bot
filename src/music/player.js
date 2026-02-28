@@ -151,21 +151,44 @@ export class MusicPlayer {
 
     try {
       if (!queue.player) {
+        log(`プレイヤー作成開始: guildId=${guildId}, channelId=${voiceChannelId}`, 'music');
+
+        // @discordjs/voice で先に接続を確立
+        const guild = this.client.guilds.cache.get(guildId);
+        if (!guild) {
+          throw new Error('ギルドが見つかりません');
+        }
+
+        const channel = guild.channels.cache.get(voiceChannelId);
+        if (!channel || !channel.isVoiceBased()) {
+          throw new Error('ボイスチャンネルが見つかりません');
+        }
+
+        // @discordjs/voice で接続
+        const { joinVoiceChannel } = await import('@discordjs/voice');
+        queue.voiceConnection = joinVoiceChannel({
+          channelId: voiceChannelId,
+          guildId: guildId,
+          adapterCreator: guild.voiceAdapterCreator,
+          selfDeaf: false,
+          selfMute: false,
+        });
+
+        log('Discord.js voice 接続成功', 'music');
+
+        // Shoukaku player を作成
         const node = this.shoukaku.nodes.get('main');
         if (!node) {
           throw new Error('Lavalinkノードが利用できません');
         }
 
-        log(`プレイヤー作成開始: guildId=${guildId}, channelId=${voiceChannelId}`, 'music');
-
-        // Shoukaku v4 では joinChannel でプレイヤーを作成
         queue.player = await node.joinChannel({
           guildId,
           channelId: voiceChannelId,
           shardId: 0,
         });
 
-        log('プレイヤー作成成功', 'music');
+        log('Shoukaku プレイヤー作成成功', 'music');
 
         queue.player.on('end', () => {
           if (queue.repeat && queue.current) {
@@ -184,13 +207,22 @@ export class MusicPlayer {
 
       queue.current = queue.tracks.shift();
       
-      // Lavalink v4 形式に対応
-      const trackData = queue.current.encoded || queue.current.track;
+      // Lavalink v4 形式: encoded フィールドを確実に取得
+      let trackData;
+      if (queue.current.encoded) {
+        trackData = queue.current.encoded;
+      } else if (queue.current.track) {
+        trackData = queue.current.track;
+      } else {
+        throw new Error('トラックデータが見つかりません');
+      }
       
-      log(`再生開始試行: ${queue.current.info.title}`, 'music');
+      log(`再生開始試行: ${queue.current.info?.title || 'Unknown'}`, 'music');
+      log(`トラックデータ: ${trackData.substring(0, 50)}...`, 'music');
+      
       await queue.player.playTrack({ track: trackData });
       
-      log(`再生開始成功: ${queue.current.info.title}`, 'music');
+      log(`再生開始成功: ${queue.current.info?.title || 'Unknown'}`, 'music');
 
     } catch (error) {
       log(`再生エラー: ${error.message}`, 'error');
