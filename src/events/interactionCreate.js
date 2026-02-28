@@ -81,6 +81,21 @@ export async function execute(interaction, client) {
           }
           break;
 
+        case 'music_stop':
+          this.stopProgressBar(interaction.guildId);
+          if (queue.controlMessage) {
+            await queue.controlMessage.delete().catch(() => {});
+            queue.controlMessage = null;
+          }
+          queue.tracks = [];
+          queue.current = null;
+          await musicPlayer.skip(interaction.guildId);
+          await interaction.reply({ 
+            content: '⏹️ 停止しました', 
+            flags: [MessageFlags.Ephemeral]
+          });
+          break;
+
         default:
           await interaction.reply({ 
             content: '❌ 不明なボタンです', 

@@ -257,7 +257,10 @@ export class MusicPlayer {
           
           // 次の曲を再生
           if (queue.tracks.length > 0) {
+            log(`次の曲を再生: キュー残り${queue.tracks.length}曲`, 'music');
             await this.play(guildId, queue.player.connection.channelId);
+          } else {
+            log('キューが空になりました', 'music');
           }
         });
 
@@ -277,7 +280,10 @@ export class MusicPlayer {
           
           // 次の曲を再生
           if (queue.tracks.length > 0) {
+            log(`エラー後に次の曲を再生: キュー残り${queue.tracks.length}曲`, 'music');
             await this.play(guildId, queue.player.connection.channelId);
+          } else {
+            log('エラー後、キューが空になりました', 'music');
           }
         });
       }
