@@ -57,7 +57,10 @@ export class MusicPlayer {
   async search(query) {
     try {
       const node = this.shoukaku.nodes.get('main');
-      if (!node) throw new Error('Lavalinkノードが利用できません');
+      if (!node) {
+        log('Lavalinkノードが利用できません', 'error');
+        return { success: false, tracks: [], error: 'Lavalinkノードが利用できません' };
+      }
 
       // URLの場合はそのまま、それ以外はYouTube検索
       let searchQuery;
@@ -67,22 +70,23 @@ export class MusicPlayer {
         searchQuery = `ytsearch:${query}`;
       }
 
+      log(`Lavalink検索実行: ${searchQuery}`, 'music');
       const result = await node.rest.resolve(searchQuery);
 
       // 結果の検証
       if (!result) {
         log('検索結果がnullです', 'error');
-        return { success: false, tracks: [] };
+        return { success: false, tracks: [], error: '検索結果が取得できませんでした' };
       }
 
-      if (!result.tracks) {
-        log('result.tracksが存在しません', 'error');
-        return { success: false, tracks: [] };
+      if (!result.tracks || !Array.isArray(result.tracks)) {
+        log('result.tracksが存在しないか配列ではありません', 'error');
+        return { success: false, tracks: [], error: '検索結果の形式が不正です' };
       }
 
       if (result.tracks.length === 0) {
         log('検索結果が0件です', 'music');
-        return { success: false, tracks: [] };
+        return { success: false, tracks: [], error: '検索結果が見つかりませんでした' };
       }
 
       log(`検索成功: ${result.tracks.length}件`, 'music');
@@ -92,6 +96,7 @@ export class MusicPlayer {
       };
     } catch (error) {
       log(`検索エラー: ${error.message}`, 'error');
+      log(`エラースタック: ${error.stack}`, 'error');
       return { success: false, tracks: [], error: error.message };
     }
   }

@@ -15,10 +15,14 @@ export async function execute(interaction, client) {
       log(`コマンドエラー: ${error.message}`, 'error');
       const reply = { content: '❌ コマンド実行中にエラーが発生しました', ephemeral: true };
       
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(reply);
-      } else {
-        await interaction.reply(reply);
+      try {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply(reply);
+        } else {
+          await interaction.reply(reply);
+        }
+      } catch (replyError) {
+        log(`エラー応答の送信に失敗: ${replyError.message}`, 'error');
       }
     }
     return;
@@ -65,7 +69,15 @@ export async function execute(interaction, client) {
       }
     } catch (error) {
       log(`ボタン処理エラー: ${error.message}`, 'error');
-      await interaction.reply({ content: '❌ 処理中にエラーが発生しました', ephemeral: true });
+      try {
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({ content: '❌ 処理中にエラーが発生しました', ephemeral: true });
+        } else {
+          await interaction.reply({ content: '❌ 処理中にエラーが発生しました', ephemeral: true });
+        }
+      } catch (replyError) {
+        log(`エラー応答の送信に失敗: ${replyError.message}`, 'error');
+      }
     }
   }
 }

@@ -20,87 +20,101 @@ export async function execute(interaction, musicPlayer) {
     return interaction.editReply('❌ ボイスチャンネルに参加してください');
   }
 
-  log(`検索開始: ${query}`, 'music');
-  const result = await musicPlayer.search(query);
+  try {
+    log(`検索開始: ${query}`, 'music');
+    const result = await musicPlayer.search(query);
 
-  if (!result.success || !result.tracks || result.tracks.length === 0) {
-    return interaction.editReply('❌ 曲が見つかりませんでした。別のキーワードで試してください。');
-  }
-
-  // URLの場合は直接再生
-  if (query.startsWith('http')) {
-    const queue = musicPlayer.getQueue(interaction.guildId);
-    queue.tracks.push(result.tracks[0]);
-    queue.textChannel = interaction.channel;
-
-    if (!queue.current) {
-      await musicPlayer.play(interaction.guildId, member.voice.channelId);
+    if (!result.success || !result.tracks || result.tracks.length === 0) {
+      return interaction.editReply('❌ 曲が見つかりませんでした。別のキーワードで試してください。');
     }
 
-    return interaction.editReply(`✅ キューに追加: **${result.tracks[0].info.title}**`);
-  }
+    // URLの場合は直接再生
+    if (query.startsWith('http')) {
+      const queue = musicPlayer.getQueue(interaction.guildId);
+      queue.tracks.push(result.tracks[0]);
+      queue.textChannel = interaction.channel;
 
-  // 検索結果をSelect Menuで表示
-  const options = result.tracks.map((track, index) => ({
-    label: track.info.title.substring(0, 100),
-    description: `${track.info.author} - ${formatDuration(track.info.length)}`.substring(0, 100),
-    value: `track_${index}`
-  }));
+      if (!queue.current) {
+        await musicPlayer.play(interaction.guildId, member.voice.channelId);
+      }
 
-  const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId(`select_track_${interaction.user.id}`)
-    .setPlaceholder('再生する曲を選択してください')
-    .addOptions(options);
+      return interaction.editReply(`✅ キューに追加: **${result.tracks[0].info.title}**`);
+    }
 
-  const row = new ActionRowBuilder().addComponents(selectMenu);
+    // 検索結果をSelect Menuで表示
+    const options = result.tracks.map((track, index) => ({
+      label: track.info.title.substring(0, 100),
+      description: `${track.info.author} - ${formatDuration(track.info.length)}`.substring(0, 100),
+      value: `track_${index}`
+    }));
 
-  const embed = new EmbedBuilder()
-    .setColor('#5865F2')
-    .setTitle('🔍 検索結果')
-    .setDescription(`**${query}** の検索結果 (${result.tracks.length}件)`)
-    .setFooter({ text: '下のメニューから曲を選択してください' });
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`select_track_${interaction.user.id}`)
+      .setPlaceholder('再生する曲を選択してください')
+      .addOptions(options);
 
-  const response = await interaction.editReply({
-    embeds: [embed],
-    components: [row]
-  });
+    const row = new ActionRowBuilder().addComponents(selectMenu);
 
-  // 検索結果を一時保存
-  const collector = response.createMessageComponentCollector({
-    filter: i => i.customId === `select_track_${interaction.user.id}` && i.user.id === interaction.user.id,
-    time: 60000
-  });
+    const embed = new EmbedBuilder()
+      .setColor('#5865F2')
+      .setTitle('🔍 検索結果')
+      .setDescription(`**${query}** の検索結果 (${result.tracks.length}件)`)
+      .setFooter({ text: '下のメニューから曲を選択してください' });
 
-  collector.on('collect', async (i) => {
-    const trackIndex = parseInt(i.values[0].split('_')[1]);
-    const selectedTrack = result.tracks[trackIndex];
-
-    const queue = musicPlayer.getQueue(interaction.guildId);
-    queue.tracks.push(selectedTrack);
-    queue.textChannel = interaction.channel;
-
-    await i.update({
-      content: `✅ キューに追加: **${selectedTrack.info.title}**`,
-      embeds: [],
-      components: []
+    const response = await interaction.editReply({
+      embeds: [embed],
+      components: [row]
     });
 
-    if (!queue.current) {
-      await musicPlayer.play(interaction.guildId, member.voice.channelId);
-    }
+    // 検索結果を一時保存
+    const collector = response.createMessageComponentCollector({
+      filter: i => i.customId === `select_track_${interaction.user.id}` && i.user.id === interaction.user.id,
+      time: 60000
+    });
 
-    collector.stop();
-  });
+    collector.on('collect', async (i) => {
+      try {
+        const trackIndex = parseInt(i.values[0].split('_')[1]);
+        const selectedTrack = result.tracks[trackIndex];
 
-  collector.on('end', (collected, reason) => {
-    if (reason === 'time') {
-      interaction.editReply({
-        content: '⏱️ 選択がタイムアウトしました',
-        embeds: [],
-        components: []
-      }).catch(() => {});
-    }
-  });
+        const queue = musicPlayer.getQueue(interaction.guildId);
+        queue.tracks.push(selectedTrack);
+        queue.textChannel = interaction.channel;
+
+        await i.update({
+          content: `✅ キューに追加: **${selectedTrack.info.title}**`,
+          embeds: [],
+          components: []
+        });
+
+        if (!queue.current) {
+          await musicPlayer.play(interaction.guildId, member.voice.channelId);
+        }
+
+        collector.stop();
+      } catch (error) {
+        log(`選択処理エラー: ${error.message}`, 'error');
+        await i.update({
+          content: '❌ 曲の追加中にエラーが発生しました',
+          embeds: [],
+          components: []
+        }).catch(() => {});
+      }
+    });
+
+    collector.on('end', (collected, reason) => {
+      if (reason === 'time') {
+        interaction.editReply({
+          content: '⏱️ 選択がタイムアウトしました',
+          embeds: [],
+          components: []
+        }).catch(() => {});
+      }
+    });
+  } catch (error) {
+    log(`/play コマンドエラー: ${error.message}`, 'error');
+    return interaction.editReply('❌ 検索中にエラーが発生しました。もう一度お試しください。');
+  }
 }
 
 function formatDuration(ms) {
