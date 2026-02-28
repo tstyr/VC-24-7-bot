@@ -185,6 +185,10 @@ export class MusicPlayer {
 
         log('Shoukaku プレイヤー作成成功', 'music');
 
+        // 接続が安定するまで待機
+        await new Promise(resolve => setTimeout(resolve, 300));
+        log('接続安定化待機完了', 'music');
+
         queue.player.on('end', () => {
           if (queue.repeat && queue.current) {
             queue.tracks.unshift(queue.current);
@@ -213,8 +217,9 @@ export class MusicPlayer {
       }
       
       log(`再生開始試行: ${queue.current.info?.title || 'Unknown'}`, 'music');
-      log(`トラックデータ: ${trackData.substring(0, 50)}...`, 'music');
+      log(`トラックデータ長: ${trackData.length}文字`, 'music');
       
+      // Shoukaku v4: playTrack にトラック文字列を直接渡す
       await queue.player.playTrack({ track: trackData });
       
       log(`再生開始成功: ${queue.current.info?.title || 'Unknown'}`, 'music');
@@ -222,6 +227,12 @@ export class MusicPlayer {
     } catch (error) {
       log(`再生エラー: ${error.message}`, 'error');
       log(`エラースタック: ${error.stack}`, 'error');
+      
+      // RestError の詳細をログ
+      if (error.body) {
+        log(`RestError body: ${JSON.stringify(error.body)}`, 'error');
+      }
+      
       throw error;
     }
   }

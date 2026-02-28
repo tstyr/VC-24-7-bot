@@ -41,7 +41,13 @@ export async function execute(interaction, musicPlayer) {
       setTimeout(() => reject(new Error('検索がタイムアウトしました')), 28000)
     );
     
-    const result = await Promise.race([searchPromise, timeoutPromise]);
+    let result;
+    try {
+      result = await Promise.race([searchPromise, timeoutPromise]);
+    } catch (searchError) {
+      log(`検索エラー: ${searchError.message}`, 'error');
+      return await interaction.editReply('❌ 検索中にエラーが発生しました。もう一度お試しください。');
+    }
 
     if (!result.success || !result.tracks || result.tracks.length === 0) {
       const errorMsg = result.error || '曲が見つかりませんでした。別のキーワードで試してください。';
@@ -59,6 +65,12 @@ export async function execute(interaction, musicPlayer) {
           await musicPlayer.play(interaction.guildId, member.voice.channelId);
         } catch (playError) {
           log(`再生エラー: ${playError.message}`, 'error');
+          
+          // RestError の詳細をログ
+          if (playError.body) {
+            log(`RestError body: ${JSON.stringify(playError.body)}`, 'error');
+          }
+          
           return await interaction.editReply(`❌ 再生開始に失敗しました: ${playError.message}`);
         }
       }
@@ -118,6 +130,13 @@ export async function execute(interaction, musicPlayer) {
             await musicPlayer.play(interaction.guildId, member.voice.channelId);
           } catch (playError) {
             log(`再生開始エラー: ${playError.message}`, 'error');
+            log(`エラースタック: ${playError.stack}`, 'error');
+            
+            // RestError の詳細をログ
+            if (playError.body) {
+              log(`RestError body: ${JSON.stringify(playError.body)}`, 'error');
+            }
+            
             // 再生エラーは別途通知
             await interaction.followUp({
               content: `❌ 再生開始に失敗しました: ${playError.message}`,

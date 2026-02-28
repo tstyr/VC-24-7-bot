@@ -59,12 +59,24 @@ export async function execute(interaction, musicPlayer) {
       shardId: 0,
     });
 
+    log('Shoukaku プレイヤー作成成功', 'voice');
+
+    // 接続が安定するまで待機
+    await new Promise(resolve => setTimeout(resolve, 300));
+    log('接続安定化待機完了', 'voice');
+
     log(`${targetChannel.name} に接続しました`, 'voice');
     await interaction.editReply(`✅ ${targetChannel.name} に接続しました`);
 
   } catch (error) {
     log(`接続エラー: ${error.message}`, 'error');
     log(`エラースタック: ${error.stack}`, 'error');
+    
+    // RestError の詳細をログ
+    if (error.body) {
+      log(`RestError body: ${JSON.stringify(error.body)}`, 'error');
+    }
+    
     await interaction.editReply('❌ 接続中にエラーが発生しました');
   }
 }
