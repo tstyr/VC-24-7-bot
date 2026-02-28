@@ -76,7 +76,7 @@ export async function execute(interaction, client) {
           
           // パネルを更新
           if (queue.current && queue.controlMessage) {
-            const panel = createMusicPanel(queue.current, queue);
+            const panel = createMusicPanel(queue.current, queue, queue.player);
             await queue.controlMessage.edit(panel);
           }
           break;

@@ -36,32 +36,6 @@ client.commands.set(volumeCommand.data.name, volumeCommand);
 // 音楽プレイヤー初期化
 client.musicPlayer = new MusicPlayer(client);
 
-// 再生開始時にパネルを送信
-client.musicPlayer.shoukaku.on('ready', () => {
-  const originalPlay = client.musicPlayer.play.bind(client.musicPlayer);
-  
-  client.musicPlayer.play = async function(guildId, voiceChannelId) {
-    await originalPlay(guildId, voiceChannelId);
-    
-    const queue = this.getQueue(guildId);
-    if (queue.current && queue.textChannel) {
-      try {
-        // 古いパネルを削除
-        if (queue.controlMessage) {
-          await queue.controlMessage.delete().catch(() => {});
-        }
-        
-        // 新しいパネルを送信（player を渡す）
-        const panel = createMusicPanel(queue.current, queue, queue.player);
-        const message = await queue.textChannel.send(panel);
-        queue.controlMessage = message;
-      } catch (error) {
-        log(`パネル送信エラー: ${error.message}`, 'error');
-      }
-    }
-  };
-});
-
 // イベントハンドラー
 client.once('clientReady', (...args) => readyEvent.execute(...args, client));
 client.on(voiceStateUpdateEvent.name, voiceStateUpdateEvent.execute);

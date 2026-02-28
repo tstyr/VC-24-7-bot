@@ -312,9 +312,9 @@ export class MusicPlayer {
         if (queue.controlMessage) {
           await queue.controlMessage.delete().catch(() => {});
         }
-        // 新しいv2パネルを送信
+        // 新しいv2パネルを送信（playerを渡す）
         const { createMusicPanel } = await import('./panel.js');
-        queue.controlMessage = await queue.textChannel.send(createMusicPanel(queue.current, queue));
+        queue.controlMessage = await queue.textChannel.send(createMusicPanel(queue.current, queue, queue.player));
       }
 
     } catch (error) {

@@ -15,7 +15,9 @@ export function formatDuration(ms) {
   return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-export function createMusicPanel(track, queue) {
+export function createMusicPanel(track, queue, player = null) {
+  const currentPos = player ? player.position : 0;
+  
   const embed = new EmbedBuilder()
     .setColor('#2b2d31') // Discordモダンダーク
     .setAuthor({ 
@@ -26,8 +28,8 @@ export function createMusicPanel(track, queue) {
     .setURL(track.info.uri || null)
     .setDescription(
       `**${track.info.author || 'Unknown Artist'}**\n\n` +
-      `\`${createProgressBar(0, track.info.length, 20)}\`\n` +
-      `\`0:00 / ${formatDuration(track.info.length)}\``
+      `\`${createProgressBar(currentPos, track.info.length, 20)}\`\n` +
+      `\`${formatDuration(currentPos)} / ${formatDuration(track.info.length)}\``
     )
     .setThumbnail(
       track.info.artworkUrl || 
