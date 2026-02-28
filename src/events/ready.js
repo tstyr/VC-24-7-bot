@@ -16,7 +16,7 @@ export async function execute(client) {
   }
 
   // 24時間VC接続（Lavalink接続後に実行）
-  setTimeout(async () => {
+  client.musicPlayer.shoukaku.once('ready', async () => {
     const vcChannelId = process.env.VC_CHANNEL_ID;
     if (vcChannelId) {
       try {
@@ -36,5 +36,5 @@ export async function execute(client) {
         log(`24時間VC接続エラー: ${error.message}`, 'error');
       }
     }
-  }, 3000);
+  });
 }
