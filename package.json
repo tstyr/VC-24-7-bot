@@ -9,8 +9,8 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "shoukaku": "^4.0.1",
-    "mongoose": "^8.1.1",
-    "dotenv": "^16.4.1"
+    "dotenv": "^16.4.1",
+    "pg": "^8.19.0",
+    "shoukaku": "^4.0.1"
   }
 }

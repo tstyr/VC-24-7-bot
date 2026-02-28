@@ -1,7 +1,7 @@
 import { Client, GatewayIntentBits, Collection } from 'discord.js';
 import { config } from 'dotenv';
 import { MusicPlayer } from './music/player.js';
-import { connectDatabase } from './database/models.js';
+import { testConnection } from './database/db.js';
 import { log } from './utils/logger.js';
 import { createMusicPanel } from './music/panel.js';
 
@@ -71,7 +71,7 @@ process.on('uncaughtException', (error) => {
 // 起動
 async function start() {
   try {
-    await connectDatabase();
+    await testConnection();
     await client.login(process.env.DISCORD_TOKEN);
   } catch (error) {
     log(`起動エラー: ${error.message}`, 'error');
