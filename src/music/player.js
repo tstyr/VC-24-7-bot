@@ -73,19 +73,27 @@ export class MusicPlayer {
     // 既存のインターバルをクリア
     this.stopProgressBar(guildId);
     
-    // 5秒おきにプログレスバーを更新（API制限回避）
+    // 10秒おきにプログレスバーを更新（API制限回避 & パフォーマンス最適化）
     queue.progressInterval = setInterval(async () => {
       try {
         if (queue.player && queue.current && queue.controlMessage) {
           const { createMusicPanel } = await import('./panel.js');
           const panel = createMusicPanel(queue.current, queue, queue.player);
-          await queue.controlMessage.edit(panel);
+          await queue.controlMessage.edit(panel).catch(err => {
+            // メッセージが削除されている場合は無視
+            if (err.code !== 10008) {
+              throw err;
+            }
+          });
+        } else {
+          // 条件が満たされない場合はインターバルを停止
+          this.stopProgressBar(guildId);
         }
       } catch (error) {
         log(`プログレスバー更新エラー: ${error.message}`, 'error');
         this.stopProgressBar(guildId);
       }
-    }, 5000);
+    }, 10000); // 10秒に変更
     
     log(`プログレスバー開始: Guild ${guildId}`, 'music');
   }
@@ -265,7 +273,10 @@ export class MusicPlayer {
         });
 
         queue.player.on('exception', async (error) => {
-          log(`再生エラー: ${error.exception?.message}`, 'error');
+          log(`❌ 再生例外発生`, 'error');
+          log(`例外メッセージ: ${error.exception?.message}`, 'error');
+          log(`例外の深刻度: ${error.exception?.severity}`, 'error');
+          log(`例外の原因: ${error.exception?.cause}`, 'error');
           
           // プログレスバーを停止
           this.stopProgressBar(guildId);
@@ -299,15 +310,26 @@ export class MusicPlayer {
       
       log(`再生開始試行: ${queue.current.info?.title || 'Unknown'}`, 'music');
       log(`トラックデータ長: ${encodedTrack.length}文字`, 'music');
+      log(`トラック情報: ${JSON.stringify(queue.current.info)}`, 'music');
       
-      // Shoukaku v4 + Lavalink v4: 厳密なJSON構造で渡す
-      await queue.player.playTrack({ 
-        track: { 
-          encoded: encodedTrack 
-        } 
-      });
-      
-      log(`再生開始成功: ${queue.current.info?.title || 'Unknown'}`, 'music');
+      // Shoukaku v4 の正しい形式で再生
+      try {
+        await queue.player.playTrack({ 
+          track: { 
+            encoded: encodedTrack 
+          } 
+        });
+        log(`✅ playTrack 成功: ${queue.current.info?.title || 'Unknown'}`, 'music');
+      } catch (playError) {
+        log(`❌ playTrack 失敗: ${playError.message}`, 'error');
+        if (playError.body) {
+          log(`RestError詳細: ${JSON.stringify(playError.body, null, 2)}`, 'error');
+        }
+        if (playError.status) {
+          log(`HTTPステータス: ${playError.status}`, 'error');
+        }
+        throw playError;
+      }
       
       // プログレスバーを開始
       this.startProgressBar(guildId);
@@ -324,18 +346,32 @@ export class MusicPlayer {
       }
 
     } catch (error) {
-      log(`再生エラー: ${error.message}`, 'error');
+      log(`❌ 再生エラー発生`, 'error');
+      log(`エラーメッセージ: ${error.message}`, 'error');
       log(`エラースタック: ${error.stack}`, 'error');
       
       // RestError の詳細をログ
       if (error.body) {
-        log(`RestError body: ${JSON.stringify(error.body)}`, 'error');
+        log(`RestError body: ${JSON.stringify(error.body, null, 2)}`, 'error');
+      }
+      if (error.status) {
+        log(`HTTPステータス: ${error.status}`, 'error');
+      }
+      if (error.statusCode) {
+        log(`ステータスコード: ${error.statusCode}`, 'error');
       }
       
       // プログレスバーを停止
       this.stopProgressBar(guildId);
       
-      throw error;
+      // エラー時はキューから次の曲を試す
+      if (queue.tracks.length > 0) {
+        log(`エラーのため次の曲をスキップして再生試行`, 'music');
+        queue.current = null;
+        await this.play(guildId, voiceChannelId);
+      } else {
+        throw error;
+      }
     }
   }
 

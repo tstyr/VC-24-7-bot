@@ -52,19 +52,26 @@ export async function execute(interaction, client) {
           break;
 
         case 'music_pause':
-          await musicPlayer.pause(interaction.guildId);
-          await interaction.reply({ 
-            content: '⏸️ 一時停止しました', 
-            flags: [MessageFlags.Ephemeral]
-          });
-          break;
-
-        case 'music_resume':
-          await musicPlayer.resume(interaction.guildId);
-          await interaction.reply({ 
-            content: '▶️ 再開しました', 
-            flags: [MessageFlags.Ephemeral]
-          });
+          const isPaused = queue.player?.paused;
+          if (isPaused) {
+            await musicPlayer.resume(interaction.guildId);
+            await interaction.reply({ 
+              content: '▶️ 再開しました', 
+              flags: [MessageFlags.Ephemeral]
+            });
+          } else {
+            await musicPlayer.pause(interaction.guildId);
+            await interaction.reply({ 
+              content: '⏸️ 一時停止しました', 
+              flags: [MessageFlags.Ephemeral]
+            });
+          }
+          
+          // パネルを更新
+          if (queue.current && queue.controlMessage) {
+            const panel = createMusicPanel(queue.current, queue, queue.player);
+            await queue.controlMessage.edit(panel).catch(() => {});
+          }
           break;
 
         case 'music_repeat':
@@ -82,7 +89,7 @@ export async function execute(interaction, client) {
           break;
 
         case 'music_stop':
-          this.stopProgressBar(interaction.guildId);
+          musicPlayer.stopProgressBar(interaction.guildId);
           if (queue.controlMessage) {
             await queue.controlMessage.delete().catch(() => {});
             queue.controlMessage = null;
