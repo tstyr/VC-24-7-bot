@@ -1,5 +1,4 @@
 import { log } from '../utils/logger.js';
-import { joinChannel } from '@discordjs/voice';
 
 export const name = 'ready';
 export const once = true;
