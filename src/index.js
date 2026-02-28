@@ -55,7 +55,7 @@ client.musicPlayer.shoukaku.on('ready', () => {
 });
 
 // イベントハンドラー
-client.once('ready', (...args) => readyEvent.execute(...args, client));
+client.once('clientReady', (...args) => readyEvent.execute(...args, client));
 client.on(voiceStateUpdateEvent.name, voiceStateUpdateEvent.execute);
 client.on(interactionCreateEvent.name, (...args) => interactionCreateEvent.execute(...args, client));
 

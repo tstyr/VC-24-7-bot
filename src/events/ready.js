@@ -22,7 +22,7 @@ export async function execute(client) {
       try {
         const channel = await client.channels.fetch(vcChannelId);
         if (channel?.isVoiceBased()) {
-          const node = client.musicPlayer.shoukaku.getNode('main');
+          const node = client.musicPlayer.shoukaku.nodes.get('main');
           if (node) {
             await node.joinChannel({
               guildId: channel.guildId,
