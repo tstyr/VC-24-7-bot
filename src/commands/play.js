@@ -57,8 +57,8 @@ export async function execute(interaction, musicPlayer) {
     // URLの場合は直接再生
     if (query.startsWith('http')) {
       const queue = musicPlayer.getQueue(interaction.guildId);
+      queue.textChannel = interaction.channel; // チャンネルを記憶
       queue.tracks.push(result.tracks[0]);
-      queue.textChannel = interaction.channel;
 
       if (!queue.current) {
         try {
@@ -122,8 +122,8 @@ export async function execute(interaction, musicPlayer) {
         const selectedTrack = result.tracks[trackIndex];
 
         const queue = musicPlayer.getQueue(interaction.guildId);
+        queue.textChannel = interaction.channel; // チャンネルを記憶
         queue.tracks.push(selectedTrack);
-        queue.textChannel = interaction.channel;
 
         // 追加完了メッセージに更新
         await interaction.editReply({

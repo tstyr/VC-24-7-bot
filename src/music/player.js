@@ -230,7 +230,7 @@ export class MusicPlayer {
 
       // イベントリスナーの重複登録を防止
       if (queue.player.listeners('end').length === 0) {
-        queue.player.on('end', (data) => {
+        queue.player.on('end', async (data) => {
           // REPLACED イベントは無視（次の曲が既にキューに入っている場合）
           if (data.reason === 'REPLACED') return;
           
@@ -244,18 +244,28 @@ export class MusicPlayer {
           }
           queue.current = null;
           
-          // 次の曲を再生（キューが空でも常時接続を維持）
-          this.play(guildId, queue.player.connection.channelId);
+          // 次の曲を再生
+          if (queue.tracks.length > 0) {
+            await this.play(guildId, queue.player.connection.channelId);
+          } else if (queue.controlMessage) {
+            // キューが空になったらパネルを削除
+            queue.controlMessage.delete().catch(() => {});
+            queue.controlMessage = null;
+          }
         });
 
-        queue.player.on('exception', (error) => {
+        queue.player.on('exception', async (error) => {
           log(`再生エラー: ${error.exception?.message}`, 'error');
           
           // プログレスバーを停止
           this.stopProgressBar(guildId);
           
           queue.current = null;
-          this.play(guildId, queue.player.connection.channelId);
+          
+          // 次の曲を再生
+          if (queue.tracks.length > 0) {
+            await this.play(guildId, queue.player.connection.channelId);
+          }
         });
       }
 
@@ -282,6 +292,17 @@ export class MusicPlayer {
       
       // プログレスバーを開始
       this.startProgressBar(guildId);
+
+      // v2パネルを送信
+      if (queue.textChannel) {
+        // 古いパネルを削除
+        if (queue.controlMessage) {
+          await queue.controlMessage.delete().catch(() => {});
+        }
+        // 新しいv2パネルを送信
+        const { createMusicPanel } = await import('./panel.js');
+        queue.controlMessage = await queue.textChannel.send(createMusicPanel(queue.current, queue));
+      }
 
     } catch (error) {
       log(`再生エラー: ${error.message}`, 'error');
