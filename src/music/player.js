@@ -46,7 +46,6 @@ export class MusicPlayer {
         current: null,
         repeat: false,
         player: null,
-        voiceConnection: null,
         textChannel: null,
         controlMessage: null
       });
@@ -153,34 +152,12 @@ export class MusicPlayer {
       if (!queue.player) {
         log(`プレイヤー作成開始: guildId=${guildId}, channelId=${voiceChannelId}`, 'music');
 
-        // @discordjs/voice で先に接続を確立
-        const guild = this.client.guilds.cache.get(guildId);
-        if (!guild) {
-          throw new Error('ギルドが見つかりません');
-        }
-
-        const channel = guild.channels.cache.get(voiceChannelId);
-        if (!channel || !channel.isVoiceBased()) {
-          throw new Error('ボイスチャンネルが見つかりません');
-        }
-
-        // @discordjs/voice で接続
-        const { joinVoiceChannel } = await import('@discordjs/voice');
-        queue.voiceConnection = joinVoiceChannel({
-          channelId: voiceChannelId,
-          guildId: guildId,
-          adapterCreator: guild.voiceAdapterCreator,
-          selfDeaf: false,
-          selfMute: false,
-        });
-
-        log('Discord.js voice 接続成功', 'music');
-
         // Shoukaku v4: shoukaku インスタンスから joinVoiceChannel を呼び出す
         queue.player = await this.shoukaku.joinVoiceChannel({
           guildId: guildId,
           channelId: voiceChannelId,
           shardId: 0,
+          deaf: true,
         });
 
         log('Shoukaku プレイヤー作成成功', 'music');
@@ -219,8 +196,8 @@ export class MusicPlayer {
       log(`再生開始試行: ${queue.current.info?.title || 'Unknown'}`, 'music');
       log(`トラックデータ長: ${trackData.length}文字`, 'music');
       
-      // Shoukaku v4: playTrack にトラック文字列を直接渡す
-      await queue.player.playTrack({ track: trackData });
+      // Shoukaku v4: playTrack に正しいオブジェクト形式で渡す
+      await queue.player.playTrack({ track: { encoded: trackData } });
       
       log(`再生開始成功: ${queue.current.info?.title || 'Unknown'}`, 'music');
 
@@ -272,10 +249,8 @@ export class MusicPlayer {
 
   async disconnect(guildId) {
     const queue = this.getQueue(guildId);
-    if (queue.voiceConnection) {
-      queue.voiceConnection.destroy();
-    }
     if (queue.player) {
+      await queue.player.disconnect();
       queue.player = null;
     }
     this.queues.delete(guildId);

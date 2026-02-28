@@ -1,5 +1,4 @@
 import { log } from '../utils/logger.js';
-import { joinVoiceChannel } from '@discordjs/voice';
 
 export const name = 'ready';
 export const once = true;
@@ -25,22 +24,12 @@ export async function execute(client) {
         if (channel?.isVoiceBased()) {
           log('24時間VC接続開始', 'voice');
 
-          // @discordjs/voice で接続
-          const voiceConnection = joinVoiceChannel({
-            channelId: channel.id,
-            guildId: channel.guildId,
-            adapterCreator: channel.guild.voiceAdapterCreator,
-            selfDeaf: false,
-            selfMute: false,
-          });
-
-          log('Discord.js voice 接続成功', 'voice');
-
           // Shoukaku v4: shoukaku インスタンスから joinVoiceChannel を呼び出す
           const player = await client.musicPlayer.shoukaku.joinVoiceChannel({
             guildId: channel.guildId,
             channelId: channel.id,
             shardId: 0,
+            deaf: true,
           });
 
           log('Shoukaku プレイヤー作成成功', 'voice');
@@ -50,7 +39,6 @@ export async function execute(client) {
           log('接続安定化待機完了', 'voice');
 
           const queue = client.musicPlayer.getQueue(channel.guildId);
-          queue.voiceConnection = voiceConnection;
           queue.player = player;
 
           log(`24時間VC接続完了: ${channel.name}`, 'voice');
