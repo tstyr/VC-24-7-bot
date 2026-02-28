@@ -41,6 +41,9 @@ export async function execute(client) {
           const queue = client.musicPlayer.getQueue(channel.guildId);
           queue.player = player;
 
+          // 保存された音量を適用
+          await client.musicPlayer.applySavedVolume(player, channel.guildId);
+
           log(`24時間VC接続完了: ${channel.name}`, 'voice');
         }
       } catch (error) {

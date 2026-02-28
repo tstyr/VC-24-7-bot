@@ -18,6 +18,15 @@ export async function testConnection() {
   try {
     const client = await pool.connect();
     await client.query('SELECT NOW()');
+    
+    // guild_settings テーブルを自動作成
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS guild_settings (
+        guild_id VARCHAR(255) PRIMARY KEY,
+        volume INTEGER DEFAULT 100
+      )
+    `);
+    
     client.release();
     log('PostgreSQL接続成功', 'success');
     return true;

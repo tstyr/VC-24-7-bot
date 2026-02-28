@@ -50,6 +50,9 @@ export async function execute(interaction, musicPlayer) {
     await new Promise(resolve => setTimeout(resolve, 500));
     log('接続安定化待機完了', 'voice');
 
+    // 保存された音量を適用
+    await musicPlayer.applySavedVolume(queue.player, interaction.guildId);
+
     log(`${targetChannel.name} に接続しました`, 'voice');
     await interaction.editReply(`✅ ${targetChannel.name} に接続しました`);
 

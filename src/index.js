@@ -13,6 +13,7 @@ import * as interactionCreateEvent from './events/interactionCreate.js';
 import * as playCommand from './commands/play.js';
 import * as connectCommand from './commands/connect.js';
 import * as disconnectCommand from './commands/disconnect.js';
+import * as volumeCommand from './commands/volume.js';
 
 config();
 
@@ -30,6 +31,7 @@ client.commands = new Collection();
 client.commands.set(playCommand.data.name, playCommand);
 client.commands.set(connectCommand.data.name, connectCommand);
 client.commands.set(disconnectCommand.data.name, disconnectCommand);
+client.commands.set(volumeCommand.data.name, volumeCommand);
 
 // 音楽プレイヤー初期化
 client.musicPlayer = new MusicPlayer(client);

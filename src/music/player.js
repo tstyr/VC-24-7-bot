@@ -1,4 +1,5 @@
 import { Shoukaku, Connectors } from 'shoukaku';
+import { pool } from '../database/db.js';
 import { log } from '../utils/logger.js';
 
 export class MusicPlayer {
@@ -51,6 +52,17 @@ export class MusicPlayer {
       });
     }
     return this.queues.get(guildId);
+  }
+
+  async applySavedVolume(player, guildId) {
+    try {
+      const res = await pool.query('SELECT volume FROM guild_settings WHERE guild_id = $1', [guildId]);
+      const vol = res.rows.length > 0 ? res.rows[0].volume : 100;
+      await player.setGlobalVolume(vol);
+      log(`音量適用: ${vol}% (Guild: ${guildId})`, 'music');
+    } catch (error) {
+      log(`音量適用エラー: ${error.message}`, 'error');
+    }
   }
 
   async search(query) {
@@ -165,6 +177,9 @@ export class MusicPlayer {
         // 接続が安定するまで待機（500ms）
         await new Promise(resolve => setTimeout(resolve, 500));
         log('接続安定化待機完了', 'music');
+
+        // 保存された音量を適用
+        await this.applySavedVolume(queue.player, guildId);
 
         queue.player.on('end', () => {
           if (queue.repeat && queue.current) {
