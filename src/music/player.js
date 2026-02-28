@@ -46,6 +46,7 @@ export class MusicPlayer {
         current: null,
         repeat: false,
         player: null,
+        voiceConnection: null,
         textChannel: null,
         controlMessage: null
       });
@@ -106,10 +107,14 @@ export class MusicPlayer {
     try {
       if (!queue.player) {
         const node = this.shoukaku.nodes.get('main');
-        queue.player = await node.joinVoiceChannel({
+        if (!node) {
+          throw new Error('Lavalinkノードが利用できません');
+        }
+
+        queue.player = await node.joinChannel({
           guildId,
           channelId: voiceChannelId,
-          shardId: 0
+          shardId: 0,
         });
 
         queue.player.on('end', () => {
@@ -171,9 +176,12 @@ export class MusicPlayer {
 
   async disconnect(guildId) {
     const queue = this.getQueue(guildId);
-    if (queue.player) {
-      await queue.player.connection.disconnect();
-      this.queues.delete(guildId);
+    if (queue.voiceConnection) {
+      queue.voiceConnection.destroy();
     }
+    if (queue.player) {
+      queue.player = null;
+    }
+    this.queues.delete(guildId);
   }
 }

@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, ChannelType } from 'discord.js';
+import { joinVoiceChannel } from '@discordjs/voice';
 import { log } from '../utils/logger.js';
 
 export const data = new SlashCommandBuilder()
@@ -34,16 +35,28 @@ export async function execute(interaction, musicPlayer) {
     const queue = musicPlayer.getQueue(interaction.guildId);
     
     // 既に接続している場合は切断
+    if (queue.voiceConnection) {
+      queue.voiceConnection.destroy();
+      queue.voiceConnection = null;
+    }
     if (queue.player) {
-      await queue.player.connection.disconnect();
       queue.player = null;
     }
 
-    // 新しいチャンネルに接続
-    queue.player = await node.joinVoiceChannel({
+    // @discordjs/voice で接続
+    const voiceConnection = joinVoiceChannel({
+      channelId: targetChannel.id,
+      guildId: interaction.guildId,
+      adapterCreator: interaction.guild.voiceAdapterCreator,
+    });
+
+    queue.voiceConnection = voiceConnection;
+
+    // Shoukaku player を作成
+    queue.player = await node.joinChannel({
       guildId: interaction.guildId,
       channelId: targetChannel.id,
-      shardId: 0
+      shardId: 0,
     });
 
     log(`${targetChannel.name} に接続しました`, 'voice');

@@ -1,4 +1,5 @@
 import { log } from '../utils/logger.js';
+import { joinVoiceChannel } from '@discordjs/voice';
 
 export const name = 'ready';
 export const once = true;
@@ -27,11 +28,25 @@ export async function execute(client) {
             log('Lavalinkノード "main" が見つかりません', 'error');
             return;
           }
-          await node.joinVoiceChannel({
+
+          // @discordjs/voice で接続
+          const voiceConnection = joinVoiceChannel({
+            channelId: channel.id,
+            guildId: channel.guildId,
+            adapterCreator: channel.guild.voiceAdapterCreator,
+          });
+
+          // Shoukaku player を作成
+          const player = await node.joinChannel({
             guildId: channel.guildId,
             channelId: channel.id,
-            shardId: 0
+            shardId: 0,
           });
+
+          const queue = client.musicPlayer.getQueue(channel.guildId);
+          queue.voiceConnection = voiceConnection;
+          queue.player = player;
+
           log(`24時間VC接続: ${channel.name}`, 'voice');
         }
       } catch (error) {
