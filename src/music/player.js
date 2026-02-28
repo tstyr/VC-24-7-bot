@@ -156,19 +156,16 @@ export class MusicPlayer {
           throw new Error('Lavalinkノードが利用できません');
         }
 
-        // Shoukaku v4 では joinVoiceChannel で接続してから player を取得
-        // すでに @discordjs/voice で接続済みの場合は player のみ作成
-        const existingPlayer = node.players.get(guildId);
-        if (existingPlayer) {
-          queue.player = existingPlayer;
-        } else {
-          // 新しいプレイヤーを作成（接続は @discordjs/voice が管理）
-          queue.player = await node.joinChannel({
-            guildId,
-            channelId: voiceChannelId,
-            shardId: 0,
-          });
-        }
+        log(`プレイヤー作成開始: guildId=${guildId}, channelId=${voiceChannelId}`, 'music');
+
+        // Shoukaku v4 では joinChannel でプレイヤーを作成
+        queue.player = await node.joinChannel({
+          guildId,
+          channelId: voiceChannelId,
+          shardId: 0,
+        });
+
+        log('プレイヤー作成成功', 'music');
 
         queue.player.on('end', () => {
           if (queue.repeat && queue.current) {
@@ -189,12 +186,15 @@ export class MusicPlayer {
       
       // Lavalink v4 形式に対応
       const trackData = queue.current.encoded || queue.current.track;
+      
+      log(`再生開始試行: ${queue.current.info.title}`, 'music');
       await queue.player.playTrack({ track: trackData });
       
-      log(`再生開始: ${queue.current.info.title}`, 'music');
+      log(`再生開始成功: ${queue.current.info.title}`, 'music');
 
     } catch (error) {
       log(`再生エラー: ${error.message}`, 'error');
+      log(`エラースタック: ${error.stack}`, 'error');
       throw error;
     }
   }

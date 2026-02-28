@@ -100,6 +100,7 @@ export async function execute(interaction, musicPlayer) {
         queue.tracks.push(selectedTrack);
         queue.textChannel = interaction.channel;
 
+        // 先に update してから再生を開始
         await i.update({
           content: `✅ キューに追加: **${selectedTrack.info.title}**`,
           embeds: [],
@@ -107,18 +108,37 @@ export async function execute(interaction, musicPlayer) {
         });
 
         if (!queue.current) {
-          await musicPlayer.play(interaction.guildId, member.voice.channelId);
+          try {
+            await musicPlayer.play(interaction.guildId, member.voice.channelId);
+          } catch (playError) {
+            log(`再生開始エラー: ${playError.message}`, 'error');
+            // 再生エラーは別途通知
+            await interaction.followUp({
+              content: `❌ 再生開始に失敗しました: ${playError.message}`,
+              flags: [MessageFlags.Ephemeral]
+            }).catch(() => {});
+          }
         }
 
         collector.stop();
       } catch (error) {
         log(`選択処理エラー: ${error.message}`, 'error');
+        log(`エラースタック: ${error.stack}`, 'error');
+        
+        // インタラクションの状態を確認してから応答
         try {
-          await i.update({
-            content: '❌ 曲の追加中にエラーが発生しました',
-            embeds: [],
-            components: []
-          });
+          if (!i.replied && !i.deferred) {
+            await i.reply({
+              content: '❌ 曲の追加中にエラーが発生しました',
+              flags: [MessageFlags.Ephemeral]
+            });
+          } else if (i.deferred) {
+            await i.editReply({
+              content: '❌ 曲の追加中にエラーが発生しました',
+              embeds: [],
+              components: []
+            });
+          }
         } catch (updateError) {
           log(`update エラー: ${updateError.message}`, 'error');
         }
