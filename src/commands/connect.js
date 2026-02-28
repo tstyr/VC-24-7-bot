@@ -27,11 +27,6 @@ export async function execute(interaction, musicPlayer) {
   }
 
   try {
-    const node = musicPlayer.shoukaku.nodes.get('main');
-    if (!node) {
-      return interaction.editReply('❌ Lavalinkノードが利用できません');
-    }
-
     const queue = musicPlayer.getQueue(interaction.guildId);
     
     // 既に接続している場合は切断
@@ -43,6 +38,8 @@ export async function execute(interaction, musicPlayer) {
       queue.player = null;
     }
 
+    log('接続開始', 'voice');
+
     // @discordjs/voice で接続
     const voiceConnection = joinVoiceChannel({
       channelId: targetChannel.id,
@@ -53,9 +50,10 @@ export async function execute(interaction, musicPlayer) {
     });
 
     queue.voiceConnection = voiceConnection;
+    log('Discord.js voice 接続成功', 'voice');
 
-    // Shoukaku player を作成
-    queue.player = await node.joinChannel({
+    // Shoukaku v4: shoukaku インスタンスから joinVoiceChannel を呼び出す
+    queue.player = await musicPlayer.shoukaku.joinVoiceChannel({
       guildId: interaction.guildId,
       channelId: targetChannel.id,
       shardId: 0,
@@ -66,6 +64,7 @@ export async function execute(interaction, musicPlayer) {
 
   } catch (error) {
     log(`接続エラー: ${error.message}`, 'error');
+    log(`エラースタック: ${error.stack}`, 'error');
     await interaction.editReply('❌ 接続中にエラーが発生しました');
   }
 }

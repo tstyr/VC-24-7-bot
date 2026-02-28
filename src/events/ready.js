@@ -23,11 +23,7 @@ export async function execute(client) {
       try {
         const channel = await client.channels.fetch(vcChannelId);
         if (channel?.isVoiceBased()) {
-          const node = client.musicPlayer.shoukaku.nodes.get('main');
-          if (!node) {
-            log('Lavalinkノード "main" が見つかりません', 'error');
-            return;
-          }
+          log('24時間VC接続開始', 'voice');
 
           // @discordjs/voice で接続
           const voiceConnection = joinVoiceChannel({
@@ -38,18 +34,22 @@ export async function execute(client) {
             selfMute: false,
           });
 
-          // Shoukaku player を作成
-          const player = await node.joinChannel({
+          log('Discord.js voice 接続成功', 'voice');
+
+          // Shoukaku v4: shoukaku インスタンスから joinVoiceChannel を呼び出す
+          const player = await client.musicPlayer.shoukaku.joinVoiceChannel({
             guildId: channel.guildId,
             channelId: channel.id,
             shardId: 0,
           });
 
+          log('Shoukaku プレイヤー作成成功', 'voice');
+
           const queue = client.musicPlayer.getQueue(channel.guildId);
           queue.voiceConnection = voiceConnection;
           queue.player = player;
 
-          log(`24時間VC接続: ${channel.name}`, 'voice');
+          log(`24時間VC接続完了: ${channel.name}`, 'voice');
         }
       } catch (error) {
         log(`24時間VC接続エラー: ${error.message}`, 'error');

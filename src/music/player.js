@@ -176,14 +176,9 @@ export class MusicPlayer {
 
         log('Discord.js voice 接続成功', 'music');
 
-        // Shoukaku player を作成
-        const node = this.shoukaku.nodes.get('main');
-        if (!node) {
-          throw new Error('Lavalinkノードが利用できません');
-        }
-
-        queue.player = await node.joinChannel({
-          guildId,
+        // Shoukaku v4: shoukaku インスタンスから joinVoiceChannel を呼び出す
+        queue.player = await this.shoukaku.joinVoiceChannel({
+          guildId: guildId,
           channelId: voiceChannelId,
           shardId: 0,
         });
