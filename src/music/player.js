@@ -55,6 +55,8 @@ export class MusicPlayer {
   }
 
   async search(query) {
+    const startTime = Date.now();
+    
     try {
       const node = this.shoukaku.nodes.get('main');
       if (!node) {
@@ -71,10 +73,17 @@ export class MusicPlayer {
       }
 
       log(`Lavalink検索実行: ${searchQuery}`, 'music');
-      const result = await node.rest.resolve(searchQuery);
-
-      log(`検索結果の型: ${typeof result}`, 'music');
-      log(`検索結果: ${JSON.stringify(result)}`, 'music');
+      
+      // タイムアウト付きで検索実行（25秒）
+      const searchPromise = node.rest.resolve(searchQuery);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Lavalink検索がタイムアウトしました')), 25000)
+      );
+      
+      const result = await Promise.race([searchPromise, timeoutPromise]);
+      
+      const elapsed = Date.now() - startTime;
+      log(`検索完了: ${elapsed}ms`, 'music');
 
       // Lavalink v4 のレスポンス形式に対応
       let tracks = [];
@@ -83,6 +92,8 @@ export class MusicPlayer {
         log('検索結果がnullです', 'error');
         return { success: false, tracks: [], error: '検索結果が取得できませんでした' };
       }
+
+      log(`検索結果の型: ${typeof result}, loadType: ${result.loadType}`, 'music');
 
       // Lavalink v4 では loadType と data を持つ
       if (result.loadType === 'search' || result.loadType === 'track' || result.loadType === 'playlist') {
@@ -96,6 +107,9 @@ export class MusicPlayer {
             tracks = [result.data];
           }
         }
+      } else if (result.loadType === 'empty' || result.loadType === 'error') {
+        log(`検索失敗: ${result.loadType}`, 'error');
+        return { success: false, tracks: [], error: '検索結果が見つかりませんでした' };
       } else if (Array.isArray(result.tracks)) {
         // 旧形式（Lavalink v3）
         tracks = result.tracks;
@@ -114,8 +128,15 @@ export class MusicPlayer {
         tracks: tracks.slice(0, 15)
       };
     } catch (error) {
-      log(`検索エラー: ${error.message}`, 'error');
+      const elapsed = Date.now() - startTime;
+      log(`検索エラー (${elapsed}ms): ${error.message}`, 'error');
       log(`エラースタック: ${error.stack}`, 'error');
+      
+      // タイムアウトエラーの場合は明確に通知
+      if (error.message.includes('タイムアウト')) {
+        return { success: false, tracks: [], error: 'Lavalinkサーバーの応答が遅れています。しばらく待ってから再試行してください。' };
+      }
+      
       return { success: false, tracks: [], error: error.message };
     }
   }

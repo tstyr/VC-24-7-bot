@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, StringSelectMenuBuilder, ActionRowBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, StringSelectMenuBuilder, ActionRowBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 import { log } from '../utils/logger.js';
 
 export const data = new SlashCommandBuilder()
@@ -11,21 +11,40 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction, musicPlayer) {
-  await interaction.deferReply();
+  // 最優先で deferReply を実行
+  try {
+    await interaction.deferReply();
+  } catch (error) {
+    log(`deferReply エラー: ${error.message}`, 'error');
+    return;
+  }
 
   const query = interaction.options.getString('曲名');
   const member = interaction.member;
 
+  // ボイスチャンネルチェック
   if (!member.voice.channel) {
-    return interaction.editReply('❌ ボイスチャンネルに参加してください');
+    try {
+      return await interaction.editReply('❌ ボイスチャンネルに参加してください');
+    } catch (error) {
+      log(`editReply エラー: ${error.message}`, 'error');
+      return;
+    }
   }
 
   try {
     log(`検索開始: ${query}`, 'music');
-    const result = await musicPlayer.search(query);
+    
+    // タイムアウト付きで検索実行（30秒）
+    const searchPromise = musicPlayer.search(query);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('検索がタイムアウトしました')), 30000)
+    );
+    
+    const result = await Promise.race([searchPromise, timeoutPromise]);
 
     if (!result.success || !result.tracks || result.tracks.length === 0) {
-      return interaction.editReply('❌ 曲が見つかりませんでした。別のキーワードで試してください。');
+      return await interaction.editReply('❌ 曲が見つかりませんでした。別のキーワードで試してください。');
     }
 
     // URLの場合は直接再生
@@ -38,7 +57,7 @@ export async function execute(interaction, musicPlayer) {
         await musicPlayer.play(interaction.guildId, member.voice.channelId);
       }
 
-      return interaction.editReply(`✅ キューに追加: **${result.tracks[0].info.title}**`);
+      return await interaction.editReply(`✅ キューに追加: **${result.tracks[0].info.title}**`);
     }
 
     // 検索結果をSelect Menuで表示
@@ -94,11 +113,15 @@ export async function execute(interaction, musicPlayer) {
         collector.stop();
       } catch (error) {
         log(`選択処理エラー: ${error.message}`, 'error');
-        await i.update({
-          content: '❌ 曲の追加中にエラーが発生しました',
-          embeds: [],
-          components: []
-        }).catch(() => {});
+        try {
+          await i.update({
+            content: '❌ 曲の追加中にエラーが発生しました',
+            embeds: [],
+            components: []
+          });
+        } catch (updateError) {
+          log(`update エラー: ${updateError.message}`, 'error');
+        }
       }
     });
 
@@ -108,12 +131,18 @@ export async function execute(interaction, musicPlayer) {
           content: '⏱️ 選択がタイムアウトしました',
           embeds: [],
           components: []
-        }).catch(() => {});
+        }).catch(error => log(`タイムアウト通知エラー: ${error.message}`, 'error'));
       }
     });
   } catch (error) {
     log(`/play コマンドエラー: ${error.message}`, 'error');
-    return interaction.editReply('❌ 検索中にエラーが発生しました。もう一度お試しください。');
+    log(`エラースタック: ${error.stack}`, 'error');
+    
+    try {
+      await interaction.editReply('❌ 検索中にエラーが発生しました。もう一度お試しください。');
+    } catch (replyError) {
+      log(`エラー応答の送信に失敗: ${replyError.message}`, 'error');
+    }
   }
 }
 
