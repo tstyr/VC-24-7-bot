@@ -32,8 +32,9 @@ export async function execute(interaction, musicPlayer) {
 
     // 現在再生中の場合は即座に音量を変更
     const queue = musicPlayer.getQueue(interaction.guildId);
-    if (queue.player) {
-      await queue.player.setGlobalVolume(volume);
+    queue.volume = volume;
+    if (queue.resource?.volume) {
+      queue.resource.volume.setVolume(volume / 100);
       log(`現在の再生音量を変更: ${volume}%`, 'music');
     }
 

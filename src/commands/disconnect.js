@@ -12,9 +12,10 @@ export async function execute(interaction, musicPlayer) {
     const guild = interaction.guild;
     const me = guild.members.me;
     const queue = musicPlayer.getQueue(interaction.guildId);
+    const connection = musicPlayer.connections.get(interaction.guildId);
 
     // botがVCに接続していない場合
-    if (!queue.player && !me?.voice?.channelId) {
+    if (!queue.audioPlayer && !connection && !me?.voice?.channelId) {
       return interaction.editReply('❌ ボイスチャンネルに接続していません');
     }
 

@@ -17,8 +17,8 @@ export async function execute(oldState, newState) {
         // 音楽再生中でなければ5秒後に再接続
         if (!queue?.current) {
           setTimeout(() => {
-            log('ボット切断検知 → Raw Gatewayで再接続します...', 'voice');
-            client.musicPlayer?.joinVCRaw(oldState.guild.id, vcChannelId);
+            log('ボット切断検知 → @discordjs/voiceで再接続します...', 'voice');
+            client.musicPlayer?.joinVC(oldState.guild.id, vcChannelId);
           }, 5000);
         }
       }

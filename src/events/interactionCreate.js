@@ -52,7 +52,7 @@ export async function execute(interaction, client) {
           break;
 
         case 'music_pause':
-          const isPaused = queue.player?.paused;
+          const isPaused = queue.audioPlayer?.state?.status === 'paused';
           if (isPaused) {
             await musicPlayer.resume(interaction.guildId);
             await interaction.reply({ 
@@ -69,7 +69,7 @@ export async function execute(interaction, client) {
           
           // パネルを更新
           if (queue.current && queue.controlMessage) {
-            const panel = createMusicPanel(queue.current, queue, queue.player);
+            const panel = createMusicPanel(queue.current, queue);
             await queue.controlMessage.edit(panel).catch(() => {});
           }
           break;
@@ -83,7 +83,7 @@ export async function execute(interaction, client) {
           
           // パネルを更新
           if (queue.current && queue.controlMessage) {
-            const panel = createMusicPanel(queue.current, queue, queue.player);
+            const panel = createMusicPanel(queue.current, queue);
             await queue.controlMessage.edit(panel);
           }
           break;

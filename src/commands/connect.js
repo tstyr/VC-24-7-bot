@@ -27,21 +27,12 @@ export async function execute(interaction, musicPlayer) {
 
   try {
     const queue = musicPlayer.getQueue(interaction.guildId);
-    
-    // 既に接続している場合はクリーンアップ
-    if (queue.player) {
-      try {
-        musicPlayer.shoukaku.leaveVoiceChannel(interaction.guildId);
-      } catch (e) { /* ignore */ }
-      queue.player = null;
-    }
-
     queue.voiceChannelId = targetChannel.id;
 
-    // Raw Gateway opcode で接続（Lavalink不要）
-    musicPlayer.joinVCRaw(interaction.guildId, targetChannel.id);
+    // @discordjs/voice で接続
+    musicPlayer.joinVC(interaction.guildId, targetChannel.id);
 
-    log(`${targetChannel.name} にRaw Gatewayで接続しました`, 'voice');
+    log(`${targetChannel.name} に接続しました`, 'voice');
     await interaction.editReply(`✅ ${targetChannel.name} に接続しました`);
 
   } catch (error) {

@@ -1,4 +1,5 @@
 import { log } from '../utils/logger.js';
+import { VoiceConnectionStatus } from '@discordjs/voice';
 
 export const name = 'ready';
 export const once = true;
@@ -15,7 +16,7 @@ export async function execute(client) {
     log(`コマンド登録エラー: ${error.message}`, 'error');
   }
 
-  // 24時間VC接続（Lavalink不要 - Raw Discord Gateway opcode 4）
+  // 24時間VC接続（@discordjs/voice）
   const vcChannelId = process.env.VC_CHANNEL_ID;
   if (vcChannelId) {
     try {
@@ -23,14 +24,15 @@ export async function execute(client) {
       if (!channel?.isVoiceBased()) {
         log(`VC_CHANNEL_ID ${vcChannelId} はVoiceチャンネルではありません`, 'error');
       } else {
-        // Gateway接続が安定するまで少し待機
+        // Gateway接続が安定するまで待機
         await new Promise(resolve => setTimeout(resolve, 3000));
-        
+
         const queue = client.musicPlayer.getQueue(channel.guildId);
         queue.voiceChannelId = channel.id;
-        
-        client.musicPlayer.joinVCRaw(channel.guildId, channel.id);
-        log(`24時間VC接続完了（Raw Gateway）: ${channel.name}`, 'voice');
+
+        client.musicPlayer.joinVC(channel.guildId, channel.id);
+        await client.musicPlayer.applySavedVolume(channel.guildId);
+        log(`24時間VC接続完了 (@discordjs/voice): ${channel.name}`, 'voice');
       }
     } catch (error) {
       log(`24時間VC接続エラー: ${error.message}`, 'error');
@@ -45,22 +47,17 @@ export async function execute(client) {
         if (!guild) return;
 
         const me = guild.members.me;
-        if (!me?.voice?.channelId) {
-          // 音楽再生中でなければ再接続
-          const queue = client.musicPlayer.getQueue(guildId);
-          if (!queue.current && !queue.player) {
-            log('ボットがVCにいません。Raw Gatewayで再接続します...', 'voice');
-            client.musicPlayer.joinVCRaw(guildId, vcChannelId);
-          }
+        const connection = client.musicPlayer.connections.get(guildId);
+        const queue = client.musicPlayer.getQueue(guildId);
+
+        // 音楽再生中でなく、VCにいない場合は再接続
+        if (!queue.current && (!me?.voice?.channelId || !connection || connection.state.status === VoiceConnectionStatus.Destroyed)) {
+          log('ボットがVCにいません。再接続します...', 'voice');
+          client.musicPlayer.joinVC(guildId, vcChannelId);
         }
       } catch (error) {
-        // silent - 30秒ごとのチェックなのでエラー無視
+        // silent
       }
     }, 30000);
   }
-
-  // Lavalink接続状態ログ（音楽再生用）
-  client.musicPlayer.shoukaku.on('ready', (nodeName) => {
-    log(`Lavalink ${nodeName} 接続完了（音楽検索・再生用）`, 'success');
-  });
 }

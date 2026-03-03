@@ -20,8 +20,8 @@ export function formatDuration(ms) {
   return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-export function createMusicPanel(track, queue, player = null) {
-  const currentPos = player?.position || 0;
+export function createMusicPanel(track, queue) {
+  const currentPos = queue.resource?.playbackDuration || 0;
   const totalLength = track.info?.length || 0;
   
   // プログレスバーの視覚的表現
@@ -62,13 +62,12 @@ export function createMusicPanel(track, queue, player = null) {
       },
       { 
         name: '🔊 Status', 
-        value: player?.paused ? '`⏸️ Paused`' : '`▶️ Playing`', 
+        value: queue.audioPlayer?.state?.status === 'paused' ? '`⏸️ Paused`' : '`▶️ Playing`', 
         inline: true 
       }
     )
     .setFooter({ 
-      text: '🎵 Music Player v2 • Powered by Lavalink v4', 
-      iconURL: 'https://cdn.discordapp.com/attachments/1234567890/lavalink-icon.png' 
+      text: '🎵 Music Player v2', 
     })
     .setTimestamp();
 
@@ -76,8 +75,8 @@ export function createMusicPanel(track, queue, player = null) {
     .addComponents(
       new ButtonBuilder()
         .setCustomId('music_pause')
-        .setLabel(player?.paused ? 'Resume' : 'Pause')
-        .setEmoji(player?.paused ? '▶️' : '⏸️')
+        .setLabel(queue.audioPlayer?.state?.status === 'paused' ? 'Resume' : 'Pause')
+        .setEmoji(queue.audioPlayer?.state?.status === 'paused' ? '▶️' : '⏸️')
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId('music_skip')
