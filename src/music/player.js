@@ -221,72 +221,53 @@ export class MusicPlayer {
 
   async search(query) {
     const startTime = Date.now();
-
     try {
-      const node = [...this.shoukaku.nodes.values()].find(n => this.readyNodes.has(n.name));
-      if (!node) {
-        log(`利用可能なLavalinkノードがありません`, 'error');
-        return { success: false, tracks: [], error: 'Lavalinkノードが利用できません' };
-      }
-      log(`検索ノード: ${node.name}`, 'music');
-
-      let searchQuery;
-      if (query.startsWith('http://') || query.startsWith('https://')) {
-        searchQuery = query;
-      } else {
-        // SoundCloudで検索（YouTubeはKoyebのIPがブロックされるため）
-        searchQuery = `scsearch:${query}`;
-      }
-
-      log(`Lavalink検索実行: ${searchQuery}`, 'music');
-
-      const searchPromise = node.rest.resolve(searchQuery);
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Lavalink検索がタイムアウトしました')), 25000)
-      );
-
-      const result = await Promise.race([searchPromise, timeoutPromise]);
-      const elapsed = Date.now() - startTime;
-      log(`検索完了: ${elapsed}ms`, 'music');
-
-      if (!result) {
-        return { success: false, tracks: [], error: '検索結果が取得できませんでした' };
-      }
-
-      log(`検索結果: loadType=${result.loadType}`, 'music');
-
       let tracks = [];
-      if (result.loadType === 'search' || result.loadType === 'track' || result.loadType === 'playlist') {
-        if (result.data) {
-          if (Array.isArray(result.data)) {
-            tracks = result.data;
-          } else if (result.data.tracks && Array.isArray(result.data.tracks)) {
-            tracks = result.data.tracks;
-          } else if (result.data.encoded) {
-            tracks = [result.data];
-          }
+
+      if (query.startsWith('http://') || query.startsWith('https://')) {
+        // URL直接指定 → play-dlで情報取得
+        try {
+          const info = await playdl.soundcloud(query);
+          tracks = [{
+            info: {
+              title: info.name,
+              uri: info.url,
+              author: info.publisher?.artist || 'Unknown',
+              length: (info.durationInSec || 0) * 1000,
+              artworkUrl: info.thumbnail
+            }
+          }];
+        } catch (e) {
+          return { success: false, tracks: [], error: 'URLの情報取得に失敗しました' };
         }
-      } else if (result.loadType === 'empty' || result.loadType === 'error') {
-        return { success: false, tracks: [], error: '検索結果が見つかりませんでした' };
-      } else if (Array.isArray(result.tracks)) {
-        tracks = result.tracks;
-      } else if (Array.isArray(result)) {
-        tracks = result;
+      } else {
+        // SoundCloudで検索（play-dl直接 - Lavalinkを経由しない）
+        log(`SoundCloud検索: ${query}`, 'music');
+        const results = await playdl.search(query, {
+          source: { soundcloud: 'tracks' },
+          limit: 15
+        });
+        tracks = results.map(t => ({
+          info: {
+            title: t.name,
+            uri: t.url,
+            author: t.publisher?.artist || t.user?.name || 'Unknown',
+            length: (t.durationInSec || 0) * 1000,
+            artworkUrl: t.thumbnail
+          }
+        }));
       }
 
       if (tracks.length === 0) {
         return { success: false, tracks: [], error: '検索結果が見つかりませんでした' };
       }
 
-      log(`検索成功: ${tracks.length}件`, 'music');
-      return { success: true, tracks: tracks.slice(0, 15) };
+      const elapsed = Date.now() - startTime;
+      log(`検索成功: ${tracks.length}件 (${elapsed}ms)`, 'music');
+      return { success: true, tracks };
     } catch (error) {
       const elapsed = Date.now() - startTime;
       log(`検索エラー (${elapsed}ms): ${error.message}`, 'error');
-
-      if (error.message.includes('タイムアウト')) {
-        return { success: false, tracks: [], error: 'Lavalinkサーバーの応答が遅れています。' };
-      }
       return { success: false, tracks: [], error: error.message };
     }
   }
@@ -387,21 +368,8 @@ export class MusicPlayer {
 
       log(`ストリーム取得: ${queue.current.info?.title} (${trackUrl})`, 'music');
 
-      // SoundCloud URLの場合はplay-dlで直接ストリーム取得
-      // YouTube URLはKoyebのIPがブロックされるためSoundCloudにフォールバック
-      let stream;
-      if (trackUrl.includes('soundcloud.com')) {
-        stream = await playdl.stream(trackUrl, { discordPlayerCompatibility: true });
-      } else {
-        // YouTubeの場合はSoundCloudで再検索してストリーム取得
-        log(`YouTubeURLをSoundCloudで再検索: ${queue.current.info?.title}`, 'music');
-        const scResults = await playdl.search(queue.current.info?.title || '', { source: { soundcloud: 'tracks' }, limit: 1 });
-        if (!scResults || scResults.length === 0) {
-          throw new Error('SoundCloudで曲が見つかりませんでした');
-        }
-        log(`SoundCloud代替: ${scResults[0].name} (${scResults[0].url})`, 'music');
-        stream = await playdl.stream(scResults[0].url, { discordPlayerCompatibility: true });
-      }
+      // play-dlでSoundCloudストリームを取得
+      const stream = await playdl.stream(trackUrl, { discordPlayerCompatibility: true });
 
       if (!stream) {
         throw new Error('ストリームの取得に失敗しました');
