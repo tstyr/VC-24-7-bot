@@ -43,6 +43,9 @@ export class MusicPlayer {
 
     log(`Lavalinkノード構成: ${nodes.map(n => n.name).join(', ')} (${nodes.length}ノード)`, 'music');
 
+    // readyイベントで手動追跡（Shoukaku内部のstate値が信頼できないため）
+    this.readyNodes = new Set();
+
     this.shoukaku = new Shoukaku(
       new Connectors.DiscordJS(client),
       nodes,
@@ -51,7 +54,10 @@ export class MusicPlayer {
         resumable: false,
         reconnectTries: 3,
         reconnectInterval: 5000,
-        nodeResolver: (nodes) => [...nodes.values()].find(n => n.state === 2) || null
+        nodeResolver: (nodes) => {
+          // readyNodesセットを使って利用可能ノードを探す
+          return [...nodes.values()].find(n => this.readyNodes.has(n.name)) || null;
+        }
       }
     );
 
@@ -60,8 +66,8 @@ export class MusicPlayer {
 
   setupEvents() {
     this.shoukaku.on('ready', (name, reconnected) => {
-      const connectedNodes = [...this.shoukaku.nodes.values()].filter(n => n.state === 2);
-      log(`Lavalink ${name} 接続成功 (再接続=${!!reconnected}, 利用可能ノード数=${connectedNodes.length})`, 'success');
+      this.readyNodes.add(name);
+      log(`Lavalink ${name} 接続成功 (再接続=${!!reconnected}, 利用可能: [${[...this.readyNodes].join(', ')}] ${this.readyNodes.size}ノード)`, 'success');
     });
 
     this.shoukaku.on('error', (name, error) => {
@@ -70,11 +76,11 @@ export class MusicPlayer {
     });
 
     this.shoukaku.on('disconnect', (name, reason) => {
-      const connectedNodes = [...this.shoukaku.nodes.values()].filter(n => n.state === 2);
-      log(`Lavalink ${name} 切断 (理由: ${JSON.stringify(reason)}, 残りノード数=${connectedNodes.length})`, 'error');
+      this.readyNodes.delete(name);
+      log(`Lavalink ${name} 切断 (理由: ${JSON.stringify(reason)}, 残り: [${[...this.readyNodes].join(', ')}] ${this.readyNodes.size}ノード)`, 'error');
       
       // 利用可能なノードが0の場合のみプレイヤーをクリア
-      if (connectedNodes.length === 0) {
+      if (this.readyNodes.size === 0) {
         for (const [guildId, queue] of this.queues) {
           this.stopProgressBar(guildId);
           queue.player = null;
@@ -85,7 +91,13 @@ export class MusicPlayer {
     });
 
     this.shoukaku.on('reconnecting', (name) => {
-      log(`Lavalink ${name} 再接続中...`, 'error');
+      this.readyNodes.delete(name);
+      log(`Lavalink ${name} 再接続中... (利用可能: [${[...this.readyNodes].join(', ')}])`, 'error');
+    });
+
+    this.shoukaku.on('close', (name, code, reason) => {
+      this.readyNodes.delete(name);
+      log(`Lavalink ${name} クローズ: code=${code}, reason=${reason}`, 'error');
     });
   }
 
@@ -162,10 +174,14 @@ export class MusicPlayer {
     const startTime = Date.now();
     
     try {
-      // 利用可能なノードを探す（state 2 = CONNECTED）
-      const node = [...this.shoukaku.nodes.values()].find(n => n.state === 2);
+      // 利用可能なノードを探す（readyNodesセットで追跡）
+      const node = [...this.shoukaku.nodes.values()].find(n => this.readyNodes.has(n.name));
       if (!node) {
-        log('利用可能なLavalinkノードがありません', 'error');
+        log(`利用可能なLavalinkノードがありません (readyNodes: [${[...this.readyNodes].join(', ')}])`, 'error');
+        // 全ノードのstateをデバッグログ
+        for (const [name, n] of this.shoukaku.nodes) {
+          log(`  ノード ${name}: state=${n.state}, ws=${n.ws?.readyState}`, 'error');
+        }
         return { success: false, tracks: [], error: 'Lavalinkノードが利用できません' };
       }
       log(`検索ノード: ${node.name}`, 'music');
@@ -277,11 +293,10 @@ export class MusicPlayer {
       // 既存プレイヤーの接続状態を検証
       if (queue.player) {
         const managedPlayer = this.shoukaku.players.get(guildId);
-        const connState = queue.player.connection?.state;
-        log(`プレイヤー状態チェック: managed=${!!managedPlayer}, connState=${connState}`, 'music');
+        log(`プレイヤー状態チェック: managed=${!!managedPlayer}`, 'music');
         
-        // Shoukaku管理外 or 接続状態が CONNECTED(2) でない場合は再作成
-        if (!managedPlayer || (connState !== undefined && connState !== 2)) {
+        // Shoukaku管理外の場合は再作成
+        if (!managedPlayer) {
           log(`プレイヤー接続が無効です。再接続します`, 'music');
           try { this.shoukaku.leaveVoiceChannel(guildId); } catch (e) { /* ignore */ }
           queue.player = null;

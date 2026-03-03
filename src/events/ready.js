@@ -25,10 +25,9 @@ export async function execute(client) {
     await new Promise(resolve => setTimeout(resolve, 5000));
 
     // 利用可能ノードをログ
-    const connectedNodes = [...client.musicPlayer.shoukaku.nodes.values()].filter(n => n.state === 2);
-    log(`利用可能なLavalinkノード: ${connectedNodes.map(n => n.name).join(', ')} (${connectedNodes.length}ノード)`, 'voice');
+    log(`利用可能なLavalinkノード: [${[...client.musicPlayer.readyNodes].join(', ')}] (${client.musicPlayer.readyNodes.size}ノード)`, 'voice');
 
-    if (connectedNodes.length === 0) {
+    if (client.musicPlayer.readyNodes.size === 0) {
       log('利用可能なLavalinkノードがありません。VC接続をスキップします', 'error');
       return;
     }
@@ -45,10 +44,9 @@ export async function execute(client) {
         log(`24時間VC接続開始 (試行 ${attempt}/${maxRetries})`, 'voice');
 
         // 利用可能ノードを再チェック
-        const availableNodes = [...client.musicPlayer.shoukaku.nodes.values()].filter(n => n.state === 2);
-        log(`現在の利用可能ノード: ${availableNodes.map(n => n.name).join(', ')}`, 'voice');
+        log(`現在の利用可能ノード: [${[...client.musicPlayer.readyNodes].join(', ')}]`, 'voice');
         
-        if (availableNodes.length === 0) {
+        if (client.musicPlayer.readyNodes.size === 0) {
           throw new Error('利用可能なLavalinkノードがありません');
         }
 
