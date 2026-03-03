@@ -1,3 +1,4 @@
+import { Server } from 'http';
 import { Shoukaku, Connectors } from 'shoukaku';
 import {
   joinVoiceChannel as djsJoinVC,
@@ -6,9 +7,10 @@ import {
   AudioPlayerStatus,
   VoiceConnectionStatus,
   entersState,
-  NoSubscriberBehavior
+  NoSubscriberBehavior,
+  StreamType
 } from '@discordjs/voice';
-import play from 'play-dl';
+import ytdlExecute from 'yt-dlp-exec';
 import { pool } from '../database/db.js';
 import { log } from '../utils/logger.js';
 
@@ -384,11 +386,21 @@ export class MusicPlayer {
 
       log(`ストリーム取得: ${queue.current.info?.title} (${trackUrl})`, 'music');
 
-      // play-dl でストリーム取得（Botチェック回避のため）
-      const stream = await play.stream(trackUrl);
+      // yt-dlp-exec を使って直接ストリームを取得（Botチェック回避の最終手段）
+      const stream = ytdlExecute.exec(trackUrl, {
+        output: '-',
+        format: 'bestaudio/best',
+        limitRate: '100K',
+        rmCacheDir: true,
+        verbose: true
+      }, { stdio: ['ignore', 'pipe', 'ignore'] }).stdout;
 
-      const resource = createAudioResource(stream.stream, {
-        inputType: stream.type,
+      if (!stream) {
+        throw new Error('yt-dlp-execからのストリーム取得に失敗しました');
+      }
+
+      const resource = createAudioResource(stream, {
+        inputType: StreamType.Arbitrary,
         inlineVolume: true,
       });
 
