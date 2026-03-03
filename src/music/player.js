@@ -7,19 +7,37 @@ export class MusicPlayer {
     this.client = client;
     this.queues = new Map();
     
-    this.shoukaku = new Shoukaku(
-      new Connectors.DiscordJS(client),
-      [{
+    // 複数のLavalinkノード（フォールバック用）
+    const nodes = [
+      {
         name: 'main',
         url: `${process.env.LAVALINK_HOST}:${process.env.LAVALINK_PORT}`,
         auth: process.env.LAVALINK_PASSWORD,
         secure: process.env.LAVALINK_SECURE === 'true'
-      }],
+      },
+      {
+        name: 'jirayu',
+        url: 'lavalink.jirayu.net:443',
+        auth: 'youshallnotpass',
+        secure: true
+      },
+      {
+        name: 'rive',
+        url: 'lavalink.rive.wtf:443',
+        auth: 'youshallnotpass',
+        secure: true
+      }
+    ];
+
+    this.shoukaku = new Shoukaku(
+      new Connectors.DiscordJS(client),
+      nodes,
       {
         moveOnDisconnect: false,
         resumable: false,
         reconnectTries: 5,
-        reconnectInterval: 5000
+        reconnectInterval: 5000,
+        nodeResolver: (nodes) => [...nodes.values()].find(n => n.state === 2) || null
       }
     );
 
@@ -124,11 +142,13 @@ export class MusicPlayer {
     const startTime = Date.now();
     
     try {
-      const node = this.shoukaku.nodes.get('main');
+      // 利用可能なノードを探す（state 2 = CONNECTED）
+      const node = [...this.shoukaku.nodes.values()].find(n => n.state === 2);
       if (!node) {
-        log('Lavalinkノードが利用できません', 'error');
+        log('利用可能なLavalinkノードがありません', 'error');
         return { success: false, tracks: [], error: 'Lavalinkノードが利用できません' };
       }
+      log(`検索ノード: ${node.name}`, 'music');
 
       // URLの場合はそのまま、それ以外はYouTube検索
       let searchQuery;
@@ -207,7 +227,8 @@ export class MusicPlayer {
     }
   }
 
-  async play(guildId, voiceChannelId) {
+  async play(guildId, voiceChannelId, _retryCount = 0) {
+    const MAX_RETRIES = 2;
     const queue = this.getQueue(guildId);
     
     // voiceChannelIdを保存
@@ -250,6 +271,10 @@ export class MusicPlayer {
       if (!queue.player) {
         log(`プレイヤー作成開始: guildId=${guildId}, channelId=${queue.voiceChannelId}`, 'music');
 
+        // 既存のセッションを確実にクリーンアップ
+        try { this.shoukaku.leaveVoiceChannel(guildId); } catch (e) { /* ignore */ }
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         // Shoukaku v4: shoukaku インスタンスから joinVoiceChannel を呼び出す
         queue.player = await this.shoukaku.joinVoiceChannel({
           guildId: guildId,
@@ -260,8 +285,8 @@ export class MusicPlayer {
 
         log('Shoukaku プレイヤー作成成功', 'music');
 
-        // 接続が安定するまで待機（500ms）
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // 接続が安定するまで待機
+        await new Promise(resolve => setTimeout(resolve, 1000));
         log('接続安定化待機完了', 'music');
 
         // 保存された音量を適用
@@ -411,13 +436,46 @@ export class MusicPlayer {
       // プログレスバーを停止
       this.stopProgressBar(guildId);
       
-      // エラー時はキューから次の曲を試す
-      if (queue.tracks.length > 0) {
-        log(`エラーのため次の曲をスキップして再生試行`, 'music');
+      // joinVoiceChannel / sendServerUpdate の RestError は接続問題
+      // → 曲をスキップしても無意味なので、リトライ上限付きで再接続を試みる
+      const isConnectionError = error.stack?.includes('sendServerUpdate') || error.stack?.includes('joinVoiceChannel');
+      
+      if (isConnectionError) {
+        log(`接続エラー検出 (リトライ ${_retryCount + 1}/${MAX_RETRIES})`, 'error');
+        // 失敗した曲をキューに戻す
+        if (queue.current) {
+          queue.tracks.unshift(queue.current);
+          queue.current = null;
+        }
+        // プレイヤーをクリア
+        try { this.shoukaku.leaveVoiceChannel(guildId); } catch (e) { /* ignore */ }
+        queue.player = null;
+        
+        if (_retryCount < MAX_RETRIES) {
+          const waitMs = (_retryCount + 1) * 3000;
+          log(`${waitMs / 1000}秒後にリトライします...`, 'music');
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+          return this.play(guildId, voiceChannelId, _retryCount + 1);
+        } else {
+          log('接続リトライ上限に達しました。再生を中止します', 'error');
+          // ユーザーに通知
+          if (queue.textChannel) {
+            await queue.textChannel.send('❌ Lavalinkサーバーへの接続に失敗しました。しばらく待ってから `/play` を再試行してください。').catch(() => {});
+          }
+          return;
+        }
+      }
+      
+      // トラック固有のエラー: 次の曲を試す（リトライ上限あり）
+      if (queue.tracks.length > 0 && _retryCount < MAX_RETRIES) {
+        log(`トラックエラーのため次の曲を再生試行`, 'music');
         queue.current = null;
-        await this.play(guildId, voiceChannelId);
+        await this.play(guildId, voiceChannelId, _retryCount + 1);
       } else {
-        throw error;
+        queue.current = null;
+        if (queue.textChannel) {
+          await queue.textChannel.send('❌ 再生に失敗しました。').catch(() => {});
+        }
       }
     }
   }
