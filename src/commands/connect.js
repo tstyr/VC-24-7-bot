@@ -30,7 +30,9 @@ export async function execute(interaction, musicPlayer) {
     
     // 既に接続している場合は切断
     if (queue.player) {
-      await queue.player.disconnect();
+      try {
+        musicPlayer.shoukaku.leaveVoiceChannel(interaction.guildId);
+      } catch (e) { /* ignore */ }
       queue.player = null;
     }
 
@@ -52,6 +54,14 @@ export async function execute(interaction, musicPlayer) {
 
     // 保存された音量を適用
     await musicPlayer.applySavedVolume(queue.player, interaction.guildId);
+
+    // Voice接続クローズ時にプレイヤーをクリア
+    queue.player.on('closed', (data) => {
+      log(`🔌 Voice接続クローズ (connect): code=${data.code}, reason=${data.reason}`, 'error');
+      musicPlayer.stopProgressBar(interaction.guildId);
+      queue.player = null;
+      queue.current = null;
+    });
 
     log(`${targetChannel.name} に接続しました`, 'voice');
     await interaction.editReply(`✅ ${targetChannel.name} に接続しました`);

@@ -37,6 +37,17 @@ export class MusicPlayer {
 
     this.shoukaku.on('disconnect', (name, reason) => {
       log(`Lavalink ${name} 切断: ${reason}`, 'error');
+      // セッションが失われたので全プレイヤーをクリア
+      for (const [guildId, queue] of this.queues) {
+        this.stopProgressBar(guildId);
+        queue.player = null;
+        queue.current = null;
+      }
+      log('全プレイヤーをクリアしました（Lavalink切断）', 'error');
+    });
+
+    this.shoukaku.on('reconnecting', (name) => {
+      log(`Lavalink ${name} 再接続中...`, 'error');
     });
   }
 
@@ -222,6 +233,20 @@ export class MusicPlayer {
     }
 
     try {
+      // 既存プレイヤーの接続状態を検証
+      if (queue.player) {
+        const managedPlayer = this.shoukaku.players.get(guildId);
+        const connState = queue.player.connection?.state;
+        log(`プレイヤー状態チェック: managed=${!!managedPlayer}, connState=${connState}`, 'music');
+        
+        // Shoukaku管理外 or 接続状態が CONNECTED(2) でない場合は再作成
+        if (!managedPlayer || (connState !== undefined && connState !== 2)) {
+          log(`プレイヤー接続が無効です。再接続します`, 'music');
+          try { this.shoukaku.leaveVoiceChannel(guildId); } catch (e) { /* ignore */ }
+          queue.player = null;
+        }
+      }
+
       if (!queue.player) {
         log(`プレイヤー作成開始: guildId=${guildId}, channelId=${queue.voiceChannelId}`, 'music');
 
@@ -302,6 +327,22 @@ export class MusicPlayer {
           } else {
             log('エラー後、キューが空になりました', 'music');
           }
+        });
+
+        // 診断・接続管理用イベントリスナー
+        queue.player.on('start', () => {
+          log(`🎵 トラック開始イベント発火: ${queue.current?.info?.title || 'Unknown'}`, 'music');
+        });
+
+        queue.player.on('stuck', (data) => {
+          log(`⚠️ トラックスタック: threshold=${data.thresholdMs}ms`, 'error');
+        });
+
+        queue.player.on('closed', (data) => {
+          log(`🔌 Voice接続クローズ: code=${data.code}, reason=${data.reason}, byRemote=${data.byRemote}`, 'error');
+          this.stopProgressBar(guildId);
+          queue.player = null;
+          queue.current = null;
         });
       }
 
@@ -423,9 +464,18 @@ export class MusicPlayer {
 
   async disconnect(guildId) {
     const queue = this.getQueue(guildId);
+    this.stopProgressBar(guildId);
     if (queue.player) {
-      await queue.player.disconnect();
+      try {
+        this.shoukaku.leaveVoiceChannel(guildId);
+      } catch (e) {
+        log(`切断エラー: ${e.message}`, 'error');
+      }
       queue.player = null;
+    }
+    if (queue.controlMessage) {
+      await queue.controlMessage.delete().catch(() => {});
+      queue.controlMessage = null;
     }
     this.queues.delete(guildId);
   }
