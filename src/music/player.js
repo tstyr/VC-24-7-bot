@@ -7,7 +7,7 @@ export class MusicPlayer {
     this.client = client;
     this.queues = new Map();
     
-    // 複数のLavalinkノード（フォールバック用）
+    // 複数のLavalinkノード（フォールバック用 - SSL + Non-SSL）
     const nodes = [
       {
         name: 'main',
@@ -16,18 +16,32 @@ export class MusicPlayer {
         secure: process.env.LAVALINK_SECURE === 'true'
       },
       {
-        name: 'jirayu',
-        url: 'lavalink.jirayu.net:443',
-        auth: 'youshallnotpass',
-        secure: true
+        name: 'lavahatry4',
+        url: 'lavahatry4.techbyte.host:3000',
+        auth: 'naig.is-a.dev',
+        secure: false
       },
       {
-        name: 'rive',
-        url: 'lavalink.rive.wtf:443',
+        name: 'embotic',
+        url: '46.202.82.147:1026',
+        auth: 'jmlitev4',
+        secure: false
+      },
+      {
+        name: 'aiko',
+        url: 'lavalink.aiko-project.xyz:2333',
+        auth: 'Rikka',
+        secure: false
+      },
+      {
+        name: 'jirayu-nonssl',
+        url: 'lavalink.jirayu.net:13592',
         auth: 'youshallnotpass',
-        secure: true
+        secure: false
       }
     ];
+
+    log(`Lavalinkノード構成: ${nodes.map(n => n.name).join(', ')} (${nodes.length}ノード)`, 'music');
 
     this.shoukaku = new Shoukaku(
       new Connectors.DiscordJS(client),
@@ -35,7 +49,7 @@ export class MusicPlayer {
       {
         moveOnDisconnect: false,
         resumable: false,
-        reconnectTries: 5,
+        reconnectTries: 3,
         reconnectInterval: 5000,
         nodeResolver: (nodes) => [...nodes.values()].find(n => n.state === 2) || null
       }
@@ -45,23 +59,29 @@ export class MusicPlayer {
   }
 
   setupEvents() {
-    this.shoukaku.on('ready', (name) => {
-      log(`Lavalink ${name} 接続成功`, 'success');
+    this.shoukaku.on('ready', (name, reconnected) => {
+      const connectedNodes = [...this.shoukaku.nodes.values()].filter(n => n.state === 2);
+      log(`Lavalink ${name} 接続成功 (再接続=${!!reconnected}, 利用可能ノード数=${connectedNodes.length})`, 'success');
     });
 
     this.shoukaku.on('error', (name, error) => {
       log(`Lavalink ${name} エラー: ${error.message}`, 'error');
+      if (error.code) log(`エラーコード: ${error.code}`, 'error');
     });
 
     this.shoukaku.on('disconnect', (name, reason) => {
-      log(`Lavalink ${name} 切断: ${reason}`, 'error');
-      // セッションが失われたので全プレイヤーをクリア
-      for (const [guildId, queue] of this.queues) {
-        this.stopProgressBar(guildId);
-        queue.player = null;
-        queue.current = null;
+      const connectedNodes = [...this.shoukaku.nodes.values()].filter(n => n.state === 2);
+      log(`Lavalink ${name} 切断 (理由: ${JSON.stringify(reason)}, 残りノード数=${connectedNodes.length})`, 'error');
+      
+      // 利用可能なノードが0の場合のみプレイヤーをクリア
+      if (connectedNodes.length === 0) {
+        for (const [guildId, queue] of this.queues) {
+          this.stopProgressBar(guildId);
+          queue.player = null;
+          queue.current = null;
+        }
+        log('全プレイヤーをクリアしました（利用可能ノード0）', 'error');
       }
-      log('全プレイヤーをクリアしました（Lavalink切断）', 'error');
     });
 
     this.shoukaku.on('reconnecting', (name) => {
