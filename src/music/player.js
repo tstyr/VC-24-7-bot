@@ -386,17 +386,25 @@ export class MusicPlayer {
 
       log(`ストリーム取得: ${queue.current.info?.title} (${trackUrl})`, 'music');
 
-      // yt-dlp-exec を使って直接ストリームを取得（Botチェック回避の最終手段）
-      const stream = ytdlExecute.exec(trackUrl, {
+      // yt-dlp-exec を使って直接ストリームを取得
+      const child = ytdlExecute.exec(trackUrl, {
         output: '-',
         format: 'bestaudio/best',
-        limitRate: '100K',
-        rmCacheDir: true,
-        verbose: true
-      }, { stdio: ['ignore', 'pipe', 'ignore'] }).stdout;
+      }, { stdio: ['ignore', 'pipe', 'pipe'] }); // stderrもpipeする
+
+      const stream = child.stdout;
+
+      child.stderr.on('data', (data) => {
+        const msg = data.toString().trim();
+        if (msg) console.log(`[yt-dlp stderr] ${msg}`);
+      });
+
+      child.on('close', (code) => {
+        log(`yt-dlp プロセス終了: code=${code}`, 'music');
+      });
 
       if (!stream) {
-        throw new Error('yt-dlp-execからのストリーム取得に失敗しました');
+        throw new Error('yt-dlpからのストリーム取得に失敗しました');
       }
 
       const resource = createAudioResource(stream, {
