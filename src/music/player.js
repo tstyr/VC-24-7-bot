@@ -234,7 +234,8 @@ export class MusicPlayer {
       if (query.startsWith('http://') || query.startsWith('https://')) {
         searchQuery = query;
       } else {
-        searchQuery = `ytsearch:${query}`;
+        // SoundCloudで検索（YouTubeはKoyebのIPがブロックされるため）
+        searchQuery = `scsearch:${query}`;
       }
 
       log(`Lavalink検索実行: ${searchQuery}`, 'music');
@@ -386,13 +387,24 @@ export class MusicPlayer {
 
       log(`ストリーム取得: ${queue.current.info?.title} (${trackUrl})`, 'music');
 
-      // play-dl を使ってストリームを取得
-      const stream = await playdl.stream(trackUrl, {
-        discordPlayerCompatibility: true
-      });
+      // SoundCloud URLの場合はplay-dlで直接ストリーム取得
+      // YouTube URLはKoyebのIPがブロックされるためSoundCloudにフォールバック
+      let stream;
+      if (trackUrl.includes('soundcloud.com')) {
+        stream = await playdl.stream(trackUrl, { discordPlayerCompatibility: true });
+      } else {
+        // YouTubeの場合はSoundCloudで再検索してストリーム取得
+        log(`YouTubeURLをSoundCloudで再検索: ${queue.current.info?.title}`, 'music');
+        const scResults = await playdl.search(queue.current.info?.title || '', { source: { soundcloud: 'tracks' }, limit: 1 });
+        if (!scResults || scResults.length === 0) {
+          throw new Error('SoundCloudで曲が見つかりませんでした');
+        }
+        log(`SoundCloud代替: ${scResults[0].name} (${scResults[0].url})`, 'music');
+        stream = await playdl.stream(scResults[0].url, { discordPlayerCompatibility: true });
+      }
 
       if (!stream) {
-        throw new Error('play-dlからのストリーム取得に失敗しました');
+        throw new Error('ストリームの取得に失敗しました');
       }
 
       const resource = createAudioResource(stream.stream, {
