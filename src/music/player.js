@@ -8,7 +8,7 @@ import {
   entersState,
   NoSubscriberBehavior
 } from '@discordjs/voice';
-import play from 'play-dl';
+import ytdl from '@distube/ytdl-core';
 import { pool } from '../database/db.js';
 import { log } from '../utils/logger.js';
 
@@ -384,10 +384,14 @@ export class MusicPlayer {
 
       log(`ストリーム取得: ${queue.current.info?.title} (${trackUrl})`, 'music');
 
-      // play-dl でYouTubeからストリーム取得
-      const stream = await play.stream(trackUrl);
-      const resource = createAudioResource(stream.stream, {
-        inputType: stream.type,
+      // @distube/ytdl-core でYouTubeからストリーム取得
+      const stream = ytdl(trackUrl, {
+        filter: 'audioonly',
+        quality: 'highestaudio',
+        highWaterMark: 1 << 25,
+      });
+
+      const resource = createAudioResource(stream, {
         inlineVolume: true,
       });
 
