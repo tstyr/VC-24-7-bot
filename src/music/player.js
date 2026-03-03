@@ -19,6 +19,8 @@ export class MusicPlayer {
     this.client = client;
     this.queues = new Map();
     this.connections = new Map(); // guildId -> VoiceConnection
+    this.playDlReady = false;
+    this.playDlInitPromise = null;
 
     // Lavalink は検索専用
     const nodes = [
@@ -73,6 +75,32 @@ export class MusicPlayer {
     );
 
     this.setupLavalinkEvents();
+  }
+
+  async ensurePlayDlReady() {
+    if (this.playDlReady) return;
+    if (this.playDlInitPromise) {
+      await this.playDlInitPromise;
+      return;
+    }
+
+    this.playDlInitPromise = (async () => {
+      const clientId = process.env.SOUNDCLOUD_CLIENT_ID || await playdl.getFreeClientID();
+      await playdl.setToken({
+        soundcloud: {
+          client_id: clientId
+        }
+      });
+      this.playDlReady = true;
+      log('play-dl SoundCloud初期化完了', 'success');
+    })();
+
+    try {
+      await this.playDlInitPromise;
+    } catch (error) {
+      this.playDlInitPromise = null;
+      throw error;
+    }
   }
 
   setupLavalinkEvents() {
@@ -222,10 +250,14 @@ export class MusicPlayer {
   async search(query) {
     const startTime = Date.now();
     try {
+      await this.ensurePlayDlReady();
       let tracks = [];
 
       if (query.startsWith('http://') || query.startsWith('https://')) {
-        // URL直接指定 → play-dlで情報取得
+        if (!query.includes('soundcloud.com')) {
+          return { success: false, tracks: [], error: 'URL再生はSoundCloud URLのみ対応しています' };
+        }
+        // URL直接指定 → SoundCloud情報を取得
         try {
           const info = await playdl.soundcloud(query);
           tracks = [{
@@ -365,6 +397,8 @@ export class MusicPlayer {
       queue.current = queue.tracks.shift();
       const trackUrl = queue.current.info?.uri;
       if (!trackUrl) throw new Error('トラックURLが見つかりません');
+
+      await this.ensurePlayDlReady();
 
       log(`ストリーム取得: ${queue.current.info?.title} (${trackUrl})`, 'music');
 
