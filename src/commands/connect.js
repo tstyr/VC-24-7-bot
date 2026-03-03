@@ -28,7 +28,7 @@ export async function execute(interaction, musicPlayer) {
   try {
     const queue = musicPlayer.getQueue(interaction.guildId);
     
-    // 既に接続している場合は切断
+    // 既に接続している場合はクリーンアップ
     if (queue.player) {
       try {
         musicPlayer.shoukaku.leaveVoiceChannel(interaction.guildId);
@@ -36,45 +36,17 @@ export async function execute(interaction, musicPlayer) {
       queue.player = null;
     }
 
-    log('接続開始', 'voice');
+    queue.voiceChannelId = targetChannel.id;
 
-    // Shoukaku v4: shoukaku インスタンスから joinVoiceChannel を呼び出す
-    queue.player = await musicPlayer.shoukaku.joinVoiceChannel({
-      guildId: interaction.guildId,
-      channelId: targetChannel.id,
-      shardId: 0,
-      deaf: true,
-    });
+    // Raw Gateway opcode で接続（Lavalink不要）
+    musicPlayer.joinVCRaw(interaction.guildId, targetChannel.id);
 
-    log('Shoukaku プレイヤー作成成功', 'voice');
-
-    // 接続が安定するまで待機（500ms）
-    await new Promise(resolve => setTimeout(resolve, 500));
-    log('接続安定化待機完了', 'voice');
-
-    // 保存された音量を適用
-    await musicPlayer.applySavedVolume(queue.player, interaction.guildId);
-
-    // Voice接続クローズ時にプレイヤーをクリア
-    queue.player.on('closed', (data) => {
-      log(`🔌 Voice接続クローズ (connect): code=${data.code}, reason=${data.reason}`, 'error');
-      musicPlayer.stopProgressBar(interaction.guildId);
-      queue.player = null;
-      queue.current = null;
-    });
-
-    log(`${targetChannel.name} に接続しました`, 'voice');
+    log(`${targetChannel.name} にRaw Gatewayで接続しました`, 'voice');
     await interaction.editReply(`✅ ${targetChannel.name} に接続しました`);
 
   } catch (error) {
     log(`接続エラー: ${error.message}`, 'error');
     log(`エラースタック: ${error.stack}`, 'error');
-    
-    // RestError の詳細をログ
-    if (error.body) {
-      log(`RestError body: ${JSON.stringify(error.body)}`, 'error');
-    }
-    
     await interaction.editReply('❌ 接続中にエラーが発生しました');
   }
 }

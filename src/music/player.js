@@ -359,7 +359,14 @@ export class MusicPlayer {
             log(`次の曲を再生: キュー残り${queue.tracks.length}曲`, 'music');
             await this.play(guildId, queue.voiceChannelId);
           } else {
-            log('キューが空になりました', 'music');
+            log('キューが空になりました - 24時間接続を維持', 'music');
+            // Lavalinkプレイヤーをクリーンアップして、raw接続で24時間維持
+            try { this.shoukaku.leaveVoiceChannel(guildId); } catch (e) { /* ignore */ }
+            queue.player = null;
+            const vcChannelId = queue.voiceChannelId || process.env.VC_CHANNEL_ID;
+            if (vcChannelId) {
+              setTimeout(() => this.joinVCRaw(guildId, vcChannelId), 1000);
+            }
           }
         });
 
@@ -457,16 +464,10 @@ export class MusicPlayer {
       log(`エラーメッセージ: ${error.message}`, 'error');
       log(`エラースタック: ${error.stack}`, 'error');
       
-      // RestError の詳細をログ
-      if (error.body) {
-        log(`RestError body: ${JSON.stringify(error.body, null, 2)}`, 'error');
-      }
-      if (error.status) {
-        log(`HTTPステータス: ${error.status}`, 'error');
-      }
-      if (error.statusCode) {
-        log(`ステータスコード: ${error.statusCode}`, 'error');
-      }
+      // エラーの全プロパティを出力（RestError bodyなど）
+      try {
+        log(`エラー全情報: ${JSON.stringify(error, Object.getOwnPropertyNames(error))}`, 'error');
+      } catch (logErr) { /* circular reference */ }
       
       // プログレスバーを停止
       this.stopProgressBar(guildId);
@@ -493,6 +494,11 @@ export class MusicPlayer {
           return this.play(guildId, voiceChannelId, _retryCount + 1);
         } else {
           log('接続リトライ上限に達しました。再生を中止します', 'error');
+          // 24時間接続は raw opcode で維持
+          const vcChannelId = queue.voiceChannelId || process.env.VC_CHANNEL_ID;
+          if (vcChannelId) {
+            setTimeout(() => this.joinVCRaw(guildId, vcChannelId), 1000);
+          }
           // ユーザーに通知
           if (queue.textChannel) {
             await queue.textChannel.send('❌ Lavalinkサーバーへの接続に失敗しました。しばらく待ってから `/play` を再試行してください。').catch(() => {});
@@ -555,6 +561,58 @@ export class MusicPlayer {
     return queue.repeat;
   }
 
+  /**
+   * Raw Discord Gateway opcode 4 でVCに接続（Lavalink不要）
+   * 24時間常駐用 - Lavalinkの sendServerUpdate を経由しない
+   */
+  joinVCRaw(guildId, channelId) {
+    try {
+      const guild = this.client.guilds.cache.get(guildId);
+      if (!guild) {
+        log(`joinVCRaw: ギルドが見つかりません: ${guildId}`, 'error');
+        return false;
+      }
+      guild.shard.send({
+        op: 4,
+        d: {
+          guild_id: guildId,
+          channel_id: channelId,
+          self_mute: false,
+          self_deaf: true
+        }
+      });
+      log(`Raw VC接続送信: guild=${guildId}, channel=${channelId}`, 'voice');
+      return true;
+    } catch (error) {
+      log(`Raw VC接続エラー: ${error.message}`, 'error');
+      return false;
+    }
+  }
+
+  /**
+   * Raw Gateway opcode 4 でVCから切断
+   */
+  leaveVCRaw(guildId) {
+    try {
+      const guild = this.client.guilds.cache.get(guildId);
+      if (!guild) return false;
+      guild.shard.send({
+        op: 4,
+        d: {
+          guild_id: guildId,
+          channel_id: null,
+          self_mute: false,
+          self_deaf: true
+        }
+      });
+      log(`Raw VC切断送信: guild=${guildId}`, 'voice');
+      return true;
+    } catch (error) {
+      log(`Raw VC切断エラー: ${error.message}`, 'error');
+      return false;
+    }
+  }
+
   async disconnect(guildId) {
     const queue = this.getQueue(guildId);
     this.stopProgressBar(guildId);
@@ -566,6 +624,8 @@ export class MusicPlayer {
       }
       queue.player = null;
     }
+    // Lavalinkプレイヤーが無くてもraw接続を切断
+    this.leaveVCRaw(guildId);
     if (queue.controlMessage) {
       await queue.controlMessage.delete().catch(() => {});
       queue.controlMessage = null;

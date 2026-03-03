@@ -15,87 +15,52 @@ export async function execute(client) {
     log(`コマンド登録エラー: ${error.message}`, 'error');
   }
 
-  // 24時間VC接続（Lavalink接続後に実行）
-  client.musicPlayer.shoukaku.once('ready', async (nodeName) => {
-    const vcChannelId = process.env.VC_CHANNEL_ID;
-    if (!vcChannelId) return;
-
-    // Lavalinkセッション初期化完了を待つ + 他のノードも接続する時間を確保
-    log(`最初のLavalinkノード ${nodeName} が接続完了。5秒後にVC接続を開始します`, 'voice');
-    await new Promise(resolve => setTimeout(resolve, 5000));
-
-    // 利用可能ノードをログ
-    log(`利用可能なLavalinkノード: [${[...client.musicPlayer.readyNodes].join(', ')}] (${client.musicPlayer.readyNodes.size}ノード)`, 'voice');
-
-    if (client.musicPlayer.readyNodes.size === 0) {
-      log('利用可能なLavalinkノードがありません。VC接続をスキップします', 'error');
-      return;
-    }
-
-    const maxRetries = 5;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const channel = await client.channels.fetch(vcChannelId);
-        if (!channel?.isVoiceBased()) {
-          log(`VC_CHANNEL_ID ${vcChannelId} はVoiceチャンネルではありません`, 'error');
-          return;
-        }
-
-        log(`24時間VC接続開始 (試行 ${attempt}/${maxRetries})`, 'voice');
-
-        // 利用可能ノードを再チェック
-        log(`現在の利用可能ノード: [${[...client.musicPlayer.readyNodes].join(', ')}]`, 'voice');
+  // 24時間VC接続（Lavalink不要 - Raw Discord Gateway opcode 4）
+  const vcChannelId = process.env.VC_CHANNEL_ID;
+  if (vcChannelId) {
+    try {
+      const channel = await client.channels.fetch(vcChannelId);
+      if (!channel?.isVoiceBased()) {
+        log(`VC_CHANNEL_ID ${vcChannelId} はVoiceチャンネルではありません`, 'error');
+      } else {
+        // Gateway接続が安定するまで少し待機
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
-        if (client.musicPlayer.readyNodes.size === 0) {
-          throw new Error('利用可能なLavalinkノードがありません');
-        }
-
-        // 既存プレイヤーをクリーンアップ
-        try { client.musicPlayer.shoukaku.leaveVoiceChannel(channel.guildId); } catch (e) { /* ignore */ }
-
-        // Shoukaku v4: shoukaku インスタンスから joinVoiceChannel を呼び出す
-        const player = await client.musicPlayer.shoukaku.joinVoiceChannel({
-          guildId: channel.guildId,
-          channelId: channel.id,
-          shardId: 0,
-          deaf: true,
-        });
-
-        log('Shoukaku プレイヤー作成成功', 'voice');
-
-        // 接続が安定するまで待機
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        log('接続安定化待機完了', 'voice');
-
         const queue = client.musicPlayer.getQueue(channel.guildId);
-        queue.player = player;
         queue.voiceChannelId = channel.id;
-
-        // Voice接続クローズ時にプレイヤーをクリア
-        player.on('closed', (data) => {
-          log(`🔌 24h VC接続クローズ: code=${data.code}, reason=${data.reason}, byRemote=${data.byRemote}`, 'error');
-          client.musicPlayer.stopProgressBar(channel.guildId);
-          queue.player = null;
-          queue.current = null;
-        });
-
-        // 保存された音量を適用
-        await client.musicPlayer.applySavedVolume(player, channel.guildId);
-
-        log(`24時間VC接続完了: ${channel.name}`, 'voice');
-        return; // 成功したのでループ終了
-      } catch (error) {
-        log(`24時間VC接続エラー (試行 ${attempt}/${maxRetries}): ${error.message}`, 'error');
-        if (error.stack) log(`エラースタック: ${error.stack}`, 'error');
-
-        if (attempt < maxRetries) {
-          const waitMs = attempt * 3000; // 3s, 6s, 9s, 12s
-          log(`${waitMs / 1000}秒後にリトライします...`, 'voice');
-          await new Promise(resolve => setTimeout(resolve, waitMs));
-        } else {
-          log('24時間VC接続: 全リトライ失敗', 'error');
-        }
+        
+        client.musicPlayer.joinVCRaw(channel.guildId, channel.id);
+        log(`24時間VC接続完了（Raw Gateway）: ${channel.name}`, 'voice');
       }
+    } catch (error) {
+      log(`24時間VC接続エラー: ${error.message}`, 'error');
     }
+
+    // 定期的にVCに再接続チェック（30秒ごと）
+    setInterval(async () => {
+      try {
+        const guildId = process.env.GUILD_ID;
+        if (!guildId) return;
+        const guild = client.guilds.cache.get(guildId);
+        if (!guild) return;
+
+        const me = guild.members.me;
+        if (!me?.voice?.channelId) {
+          // 音楽再生中でなければ再接続
+          const queue = client.musicPlayer.getQueue(guildId);
+          if (!queue.current && !queue.player) {
+            log('ボットがVCにいません。Raw Gatewayで再接続します...', 'voice');
+            client.musicPlayer.joinVCRaw(guildId, vcChannelId);
+          }
+        }
+      } catch (error) {
+        // silent - 30秒ごとのチェックなのでエラー無視
+      }
+    }, 30000);
+  }
+
+  // Lavalink接続状態ログ（音楽再生用）
+  client.musicPlayer.shoukaku.on('ready', (nodeName) => {
+    log(`Lavalink ${nodeName} 接続完了（音楽検索・再生用）`, 'success');
   });
 }

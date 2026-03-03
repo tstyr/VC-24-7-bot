@@ -9,13 +9,16 @@ export async function execute(interaction, musicPlayer) {
   await interaction.deferReply();
 
   try {
+    const guild = interaction.guild;
+    const me = guild.members.me;
     const queue = musicPlayer.getQueue(interaction.guildId);
 
-    if (!queue.player) {
+    // botがVCに接続していない場合
+    if (!queue.player && !me?.voice?.channelId) {
       return interaction.editReply('❌ ボイスチャンネルに接続していません');
     }
 
-    // プレイヤーを破棄 & キューをクリア
+    // プレイヤーを破棄 & キューをクリア & Raw接続も切断
     await musicPlayer.disconnect(interaction.guildId);
 
     log('ボイスチャンネルから切断しました', 'voice');
