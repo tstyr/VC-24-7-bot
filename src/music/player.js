@@ -10,7 +10,7 @@ import {
   NoSubscriberBehavior,
   StreamType
 } from '@discordjs/voice';
-import ytdlExecute from 'yt-dlp-exec';
+import playdl from 'play-dl';
 import { pool } from '../database/db.js';
 import { log } from '../utils/logger.js';
 
@@ -386,29 +386,17 @@ export class MusicPlayer {
 
       log(`ストリーム取得: ${queue.current.info?.title} (${trackUrl})`, 'music');
 
-      // yt-dlp-exec を使って直接ストリームを取得
-      const child = ytdlExecute.exec(trackUrl, {
-        output: '-',
-        format: 'bestaudio/best',
-      }, { stdio: ['ignore', 'pipe', 'pipe'] }); // stderrもpipeする
-
-      const stream = child.stdout;
-
-      child.stderr.on('data', (data) => {
-        const msg = data.toString().trim();
-        if (msg) console.log(`[yt-dlp stderr] ${msg}`);
-      });
-
-      child.on('close', (code) => {
-        log(`yt-dlp プロセス終了: code=${code}`, 'music');
+      // play-dl を使ってストリームを取得
+      const stream = await playdl.stream(trackUrl, {
+        discordPlayerCompatibility: true
       });
 
       if (!stream) {
-        throw new Error('yt-dlpからのストリーム取得に失敗しました');
+        throw new Error('play-dlからのストリーム取得に失敗しました');
       }
 
-      const resource = createAudioResource(stream, {
-        inputType: StreamType.Arbitrary,
+      const resource = createAudioResource(stream.stream, {
+        inputType: stream.type,
         inlineVolume: true,
       });
 
