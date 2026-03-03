@@ -306,17 +306,25 @@ export class MusicPlayer {
       if (!queue.player) {
         log(`プレイヤー作成開始: guildId=${guildId}, channelId=${queue.voiceChannelId}`, 'music');
 
+        // Raw VC接続を一旦切断（Shoukakuが新しいVOICE_SERVER_UPDATEを受信できるように）
+        this.leaveVCRaw(guildId);
+        log('Raw VC切断完了 → Shoukaku接続開始', 'music');
+
         // 既存のセッションを確実にクリーンアップ
         try { this.shoukaku.leaveVoiceChannel(guildId); } catch (e) { /* ignore */ }
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Shoukaku v4: shoukaku インスタンスから joinVoiceChannel を呼び出す
-        queue.player = await this.shoukaku.joinVoiceChannel({
+        // Shoukaku v4: joinVoiceChannel（タイムアウト15秒）
+        const joinPromise = this.shoukaku.joinVoiceChannel({
           guildId: guildId,
           channelId: queue.voiceChannelId,
           shardId: 0,
           deaf: true,
         });
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('joinVoiceChannel タイムアウト (15秒)')), 15000)
+        );
+        queue.player = await Promise.race([joinPromise, timeoutPromise]);
 
         log('Shoukaku プレイヤー作成成功', 'music');
 
@@ -472,9 +480,11 @@ export class MusicPlayer {
       // プログレスバーを停止
       this.stopProgressBar(guildId);
       
-      // joinVoiceChannel / sendServerUpdate の RestError は接続問題
+      // joinVoiceChannel / sendServerUpdate の RestError / タイムアウト は接続問題
       // → 曲をスキップしても無意味なので、リトライ上限付きで再接続を試みる
-      const isConnectionError = error.stack?.includes('sendServerUpdate') || error.stack?.includes('joinVoiceChannel');
+      const isConnectionError = error.stack?.includes('sendServerUpdate') 
+        || error.stack?.includes('joinVoiceChannel')
+        || error.message?.includes('タイムアウト');
       
       if (isConnectionError) {
         log(`接続エラー検出 (リトライ ${_retryCount + 1}/${MAX_RETRIES})`, 'error');
@@ -514,6 +524,11 @@ export class MusicPlayer {
         await this.play(guildId, voiceChannelId, _retryCount + 1);
       } else {
         queue.current = null;
+        // 24時間接続をraw opcodeで維持
+        const vcId = queue.voiceChannelId || process.env.VC_CHANNEL_ID;
+        if (vcId) {
+          setTimeout(() => this.joinVCRaw(guildId, vcId), 1000);
+        }
         if (queue.textChannel) {
           await queue.textChannel.send('❌ 再生に失敗しました。').catch(() => {});
         }
