@@ -14,6 +14,8 @@ import * as playCommand from './commands/play.js';
 import * as connectCommand from './commands/connect.js';
 import * as disconnectCommand from './commands/disconnect.js';
 import * as volumeCommand from './commands/volume.js';
+import * as roleCommand from './commands/role.js';
+import * as createroleCommand from './commands/createrole.js';
 
 config();
 
@@ -32,6 +34,8 @@ client.commands.set(playCommand.data.name, playCommand);
 client.commands.set(connectCommand.data.name, connectCommand);
 client.commands.set(disconnectCommand.data.name, disconnectCommand);
 client.commands.set(volumeCommand.data.name, volumeCommand);
+client.commands.set(roleCommand.data.name, roleCommand);
+client.commands.set(createroleCommand.data.name, createroleCommand);
 
 // 音楽プレイヤー初期化
 client.musicPlayer = new MusicPlayer(client);
