@@ -1,0 +1,3 @@
+[submodule "bot"]
+	path = bot
+	url = https://github.com/tstyr/VC-24-7-bot.git
