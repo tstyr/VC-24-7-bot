@@ -27,6 +27,10 @@ export async function getOsuApiToken(): Promise<string> {
   accessToken = data.access_token;
   tokenExpiresAt = Date.now() + (data.expires_in - 60) * 1000; // 1分の余裕
 
+  if (!accessToken) {
+    throw new Error('Failed to obtain access token');
+  }
+
   return accessToken;
 }
 
