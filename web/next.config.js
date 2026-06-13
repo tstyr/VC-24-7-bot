@@ -8,7 +8,9 @@ const nextConfig = {
   },
   eslint: {
     ignoreDuringBuilds: false
-  }
+  },
+  // Vercel deployment optimization
+  output: 'standalone'
 }
 
 module.exports = nextConfig
