@@ -45,6 +45,7 @@ export class RealtimeEstimator {
 
   private calculateTrends() {
     if (this.snapshots.length < 2) {
+      console.log('[Estimator] Not enough snapshots for trend calculation:', this.snapshots.length);
       return;
     }
 
@@ -59,6 +60,7 @@ export class RealtimeEstimator {
     const timeHours = (last.timestamp.getTime() - first.timestamp.getTime()) / (1000 * 60 * 60);
 
     if (timeHours <= 0) {
+      console.log('[Estimator] Invalid time range for trend calculation');
       return;
     }
 
@@ -67,6 +69,14 @@ export class RealtimeEstimator {
     const rankTrend = this.calculateLinearTrend(recent.map(s => s.stats.global_rank));
     const playTrend = this.calculateLinearTrend(recent.map(s => s.stats.play_count));
     const scoreTrend = this.calculateLinearTrend(recent.map(s => s.stats.total_score));
+
+    console.log('[Estimator] Trends calculated:', {
+      snapshots: recent.length,
+      timeSpanHours: timeHours.toFixed(2),
+      ppPerHour: ppTrend.toFixed(2),
+      scorePerHour: scoreTrend.toFixed(0),
+      scorePerSecond: (scoreTrend / 3600).toFixed(2)
+    });
 
     this.estimation = {
       estimated: { ...last.stats },
@@ -105,6 +115,7 @@ export class RealtimeEstimator {
 
   getEstimation(targetTime?: Date): RealtimeEstimation | null {
     if (!this.estimation || this.snapshots.length === 0) {
+      console.log('[Estimator] No estimation available - snapshots:', this.snapshots.length);
       return null;
     }
 
@@ -128,6 +139,17 @@ export class RealtimeEstimator {
     const estimatedRank = Math.max(1, Math.round(lastSnapshot.stats.global_rank - (rankPerSecond * secondsElapsed)));
     const estimatedPlays = Math.max(lastSnapshot.stats.play_count, Math.round(lastSnapshot.stats.play_count + (playsPerSecond * secondsElapsed)));
     const estimatedScore = Math.max(lastSnapshot.stats.total_score, Math.round(lastSnapshot.stats.total_score + (scorePerSecond * secondsElapsed)));
+
+    // デバッグログ（初回のみ）
+    if (secondsElapsed < 2) {
+      console.log('[Estimator] Calculation:', {
+        secondsElapsed: secondsElapsed.toFixed(1),
+        scorePerSecond: scorePerSecond.toFixed(0),
+        baseScore: lastSnapshot.stats.total_score.toLocaleString(),
+        estimatedScore: estimatedScore.toLocaleString(),
+        scoreTrend: this.estimation.trend.score_per_hour.toFixed(0)
+      });
+    }
 
     return {
       estimated: {
