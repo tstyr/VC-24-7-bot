@@ -33,6 +33,7 @@ interface OsuSnapshot {
   country_rank: number;
   play_time_seconds: number;
   play_count: number;
+  total_score: number; // 追加
   captured_at: string;
 }
 

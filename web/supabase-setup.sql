@@ -19,8 +19,12 @@ CREATE TABLE IF NOT EXISTS osu_user_snapshots (
     country_rank INTEGER,
     play_time_seconds INTEGER,
     play_count INTEGER,
+    total_score BIGINT, -- 追加
     captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- 既存テーブルにカラムを追加（すでにテーブルが存在する場合）
+ALTER TABLE osu_user_snapshots ADD COLUMN IF NOT EXISTS total_score BIGINT;
 
 -- インデックスを作成
 CREATE INDEX IF NOT EXISTS idx_osu_user_snapshots_lookup

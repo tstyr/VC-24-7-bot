@@ -24,7 +24,7 @@ export default function Dashboard() {
   const [users, setUsers] = useState<TrackedUser[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   const [selectedMode, setSelectedMode] = useState<string>('osu');
-  const [selectedMetric, setSelectedMetric] = useState<'pp' | 'global_rank' | 'play_count'>('pp');
+  const [selectedMetric, setSelectedMetric] = useState<'pp' | 'global_rank' | 'play_count' | 'total_score'>('pp');
   const [timeRange, setTimeRange] = useState<number>(24);
   const [loading, setLoading] = useState(true);
 
@@ -126,6 +126,7 @@ export default function Dashboard() {
               <option value="pp">Performance Points</option>
               <option value="global_rank">Global Rank</option>
               <option value="play_count">Play Count</option>
+              <option value="total_score">Total Score</option>
             </select>
           </div>
 

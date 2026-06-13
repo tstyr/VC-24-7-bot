@@ -14,7 +14,7 @@ interface RealtimeChartProps {
   userIds: number[];
   usernames: string[];
   mode: string;
-  metric: 'pp' | 'global_rank' | 'play_count';
+  metric: 'pp' | 'global_rank' | 'play_count' | 'total_score'; // total_score追加
   timeRange: number; // hours
 }
 
@@ -96,6 +96,7 @@ export default function RealtimeChart({
       case 'pp': return 'Performance Points';
       case 'global_rank': return 'Global Rank';
       case 'play_count': return 'Play Count';
+      case 'total_score': return 'Total Score'; // 追加
       default: return metric;
     }
   };
@@ -156,6 +157,7 @@ export default function RealtimeChart({
               formatter={(value: number, name: string) => [
                 metric === 'global_rank' ? `#${value.toLocaleString()}` : 
                 metric === 'pp' ? `${value.toFixed(2)}pp` :
+                metric === 'total_score' ? value.toLocaleString() : // 追加
                 value.toLocaleString(),
                 name
               ]}

@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
             global_rank: stats.global_rank || 0,
             country_rank: stats.country_rank || 0,
             play_count: stats.play_count || 0,
-            total_score: 0, // DBに保存されていない場合
+            total_score: stats.total_score || 0, // 追加
             accuracy: 0 // DBに保存されていない場合
           } : null,
           avatar_url: avatarUrl

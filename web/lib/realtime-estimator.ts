@@ -15,6 +15,7 @@ export interface RealtimeEstimation {
     pp_per_hour: number;
     rank_change_per_hour: number;
     plays_per_hour: number;
+    score_per_hour: number; // 追加
   };
 }
 
@@ -60,6 +61,7 @@ export class RealtimeEstimator {
     const ppDiff = last.stats.pp - first.stats.pp;
     const rankDiff = first.stats.global_rank - last.stats.global_rank; // 順位は数字が小さいほど良い
     const playDiff = last.stats.play_count - first.stats.play_count;
+    const scoreDiff = last.stats.total_score - first.stats.total_score; // 追加
 
     this.estimation = {
       estimated: { ...last.stats },
@@ -68,7 +70,8 @@ export class RealtimeEstimator {
       trend: {
         pp_per_hour: ppDiff / timeHours,
         rank_change_per_hour: rankDiff / timeHours,
-        plays_per_hour: playDiff / timeHours
+        plays_per_hour: playDiff / timeHours,
+        score_per_hour: scoreDiff / timeHours // 追加
       }
     };
   }
@@ -90,13 +93,15 @@ export class RealtimeEstimator {
     const estimatedPp = Math.max(0, lastSnapshot.stats.pp + (this.estimation.trend.pp_per_hour * hoursElapsed));
     const estimatedRank = Math.max(1, Math.round(lastSnapshot.stats.global_rank - (this.estimation.trend.rank_change_per_hour * hoursElapsed)));
     const estimatedPlays = Math.max(lastSnapshot.stats.play_count, Math.round(lastSnapshot.stats.play_count + (this.estimation.trend.plays_per_hour * hoursElapsed)));
+    const estimatedScore = Math.max(lastSnapshot.stats.total_score, Math.round(lastSnapshot.stats.total_score + (this.estimation.trend.score_per_hour * hoursElapsed))); // 追加
 
     return {
       estimated: {
         ...lastSnapshot.stats,
         pp: estimatedPp,
         global_rank: estimatedRank,
-        play_count: estimatedPlays
+        play_count: estimatedPlays,
+        total_score: estimatedScore // 追加
       },
       confidence,
       lastUpdate: now,
@@ -131,7 +136,8 @@ export class RealtimeEstimator {
     return this.estimation?.trend || {
       pp_per_hour: 0,
       rank_change_per_hour: 0,
-      plays_per_hour: 0
+      plays_per_hour: 0,
+      score_per_hour: 0 // 追加
     };
   }
 }

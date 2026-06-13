@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { RealtimeEstimator, UserStats } from '@/lib/realtime-estimator';
 import { formatNumber } from '@/lib/osu-api';
 import { TrendingUp, TrendingDown, User, Clock } from 'lucide-react';
+import MiniChart from './MiniChart';
 
 interface UserCardProps {
   username: string;
@@ -157,6 +158,14 @@ export default function UserCard({
             {formatNumber(currentStats.play_count)}
           </div>
           <div className="text-gray-400 text-xs">Plays</div>
+          {trend.plays_per_hour !== 0 && (
+            <div className={`text-xs flex items-center justify-center mt-1 ${
+              trend.plays_per_hour > 0 ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {trend.plays_per_hour > 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
+              {Math.abs(trend.plays_per_hour).toFixed(0)}/h
+            </div>
+          )}
         </div>
         
         <div className="text-center">
@@ -167,11 +176,62 @@ export default function UserCard({
         </div>
         
         <div className="text-center">
-          <div className="font-semibold">
+          <div className="font-semibold animate-counter text-osu-purple">
             {currentStats.total_score ? formatNumber(currentStats.total_score) : 'N/A'}
           </div>
-          <div className="text-gray-400 text-xs">Score</div>
+          <div className="text-gray-400 text-xs">Total Score</div>
         </div>
+      </div>
+
+      {/* 合計スコアのリアルタイム推移グラフ */}
+      <div className="mt-4 p-3 bg-gray-800 rounded-lg">
+        <div className="flex justify-between items-center mb-2">
+          <div className="text-sm font-medium text-gray-300">Total Score (Live)</div>
+          <div className="text-lg font-bold text-osu-purple animate-counter">
+            {currentStats.total_score ? formatNumber(currentStats.total_score) : 'N/A'}
+          </div>
+        </div>
+        <MiniChart
+          currentValue={currentStats.total_score || 0}
+          label="Total Score"
+          color="#8866EE"
+          formatValue={(v) => formatNumber(v)}
+          maxPoints={30}
+        />
+      </div>
+
+      {/* PP推移のリアルタイムグラフ */}
+      <div className="mt-3 p-3 bg-gray-800 rounded-lg">
+        <div className="flex justify-between items-center mb-2">
+          <div className="text-sm font-medium text-gray-300">PP Trend (Live)</div>
+          <div className="text-lg font-bold text-osu-pink animate-counter">
+            {currentStats.pp.toFixed(2)}pp
+          </div>
+        </div>
+        <MiniChart
+          currentValue={currentStats.pp}
+          label="Performance Points"
+          color="#FF66AA"
+          formatValue={(v) => `${v.toFixed(2)}pp`}
+          maxPoints={30}
+        />
+      </div>
+
+      {/* グローバルランクのリアルタイムグラフ */}
+      <div className="mt-3 p-3 bg-gray-800 rounded-lg">
+        <div className="flex justify-between items-center mb-2">
+          <div className="text-sm font-medium text-gray-300">Rank Trend (Live)</div>
+          <div className="text-lg font-bold text-osu-blue animate-counter">
+            #{formatNumber(currentStats.global_rank)}
+          </div>
+        </div>
+        <MiniChart
+          currentValue={currentStats.global_rank}
+          label="Global Rank"
+          color="#3366FF"
+          formatValue={(v) => `#${formatNumber(v)}`}
+          maxPoints={30}
+        />
       </div>
 
       <div className="mt-4 text-xs text-gray-500 flex justify-between">
