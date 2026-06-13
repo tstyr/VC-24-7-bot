@@ -17,16 +17,13 @@ if (process.env.DATABASE_URL) {
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? {
+  ssl: {
     rejectUnauthorized: false
-  } : false,
-  // Vercel用の接続設定
-  max: 3, // 接続数を増やす
+  },
+  // Supabase + Vercel用の接続設定
+  max: 1, // Supabaseは接続数制限が厳しい
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 20000, // タイムアウトを長くする
-  // DNS解決の問題対策
-  keepAlive: true,
-  keepAliveInitialDelayMillis: 10000,
+  connectionTimeoutMillis: 60000, // Supabaseは時間がかかることがある
 });
 
 // Database connection test
