@@ -4,11 +4,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
-  "env": {
-    "DATABASE_URL": "@database_url",
-    "OSU_CLIENT_ID": "@osu_client_id", 
-    "OSU_CLIENT_SECRET": "@osu_client_secret"
-  },
   "functions": {
     "app/api/**/*.ts": {
       "runtime": "nodejs18.x"
