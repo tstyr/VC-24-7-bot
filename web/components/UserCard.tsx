@@ -49,20 +49,28 @@ export default function UserCard({
   }, [estimator]);
 
   useEffect(() => {
-    // API から最新データを取得（実装時にはここで実際のAPI呼び出し）
+    // API から最新データを取得
     const fetchLatestData = async () => {
       try {
-        // TODO: 実際のAPI呼び出しをここに実装
-        // const response = await fetch(`/api/users/${osuUserId}/stats?mode=${mode}`);
-        // const realData = await response.json();
-        // estimator.correctWithRealData(realData, new Date());
+        const response = await fetch(`/api/users/${osuUserId}/stats?mode=${mode}`);
+        if (response.ok) {
+          const realData = await response.json();
+          estimator.correctWithRealData({
+            pp: realData.pp,
+            global_rank: realData.global_rank,
+            country_rank: realData.country_rank,
+            play_count: realData.play_count,
+            total_score: realData.total_score,
+            accuracy: realData.accuracy
+          }, new Date());
+        }
       } catch (error) {
         console.error('Failed to fetch latest data:', error);
       }
     };
 
-    // 5分ごとに実際のデータを取得して補正
-    const apiInterval = setInterval(fetchLatestData, 5 * 60 * 1000);
+    // 2分ごとに実際のデータを取得して補正
+    const apiInterval = setInterval(fetchLatestData, 2 * 60 * 1000);
     fetchLatestData(); // 初回実行
 
     return () => clearInterval(apiInterval);
@@ -187,15 +195,15 @@ export default function UserCard({
       <div className="mt-4 p-3 bg-gray-800 rounded-lg">
         <div className="flex justify-between items-center mb-2">
           <div className="text-sm font-medium text-gray-300">Total Score (Live)</div>
-          <div className="text-lg font-bold text-osu-purple animate-counter">
-            {currentStats.total_score ? formatNumber(currentStats.total_score) : 'N/A'}
+          <div className="text-lg font-bold text-osu-purple animate-counter font-mono">
+            {currentStats.total_score ? currentStats.total_score.toLocaleString() : 'N/A'}
           </div>
         </div>
         <MiniChart
           currentValue={currentStats.total_score || 0}
           label="Total Score"
           color="#8866EE"
-          formatValue={(v) => formatNumber(v)}
+          formatValue={(v) => v.toLocaleString()}
           maxPoints={30}
         />
       </div>

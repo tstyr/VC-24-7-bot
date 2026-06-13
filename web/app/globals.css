@@ -55,6 +55,8 @@ body {
 
 .animate-counter {
   transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
 }
 
 /* Custom scrollbar */
