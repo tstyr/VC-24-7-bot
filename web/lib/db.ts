@@ -25,7 +25,6 @@ export const pool = new Pool({
   min: 0, // 最小接続数
   idleTimeoutMillis: 10000, // アイドルタイムアウトを短く
   connectionTimeoutMillis: 30000,
-  acquireTimeoutMillis: 30000, // 接続取得タイムアウト
 });
 
 // Database connection test

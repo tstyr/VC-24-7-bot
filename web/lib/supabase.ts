@@ -13,7 +13,30 @@ if (!supabaseKey) {
 export const supabase = createClient(supabaseUrl, supabaseKey || '');
 
 // Supabase用のデータベース関数
-export async function getTrackedUsers() {
+// Supabase用の型定義
+interface OsuTrackedUser {
+  discord_id: string;
+  osu_user_id: number;
+  osu_username: string;
+  first_linked_at: string;
+  last_linked_at: string;
+}
+
+interface OsuSnapshot {
+  id: number;
+  discord_id: string;
+  osu_user_id: number;
+  osu_username: string;
+  mode: string;
+  pp: number;
+  global_rank: number;
+  country_rank: number;
+  play_time_seconds: number;
+  play_count: number;
+  captured_at: string;
+}
+
+export async function getTrackedUsers(): Promise<OsuTrackedUser[]> {
   console.log('Fetching tracked users via Supabase...');
   const { data, error } = await supabase
     .from('osu_tracked_users')
@@ -28,7 +51,7 @@ export async function getTrackedUsers() {
   return data || [];
 }
 
-export async function getAllLatestStats(mode: string = 'osu') {
+export async function getAllLatestStats(mode: string = 'osu'): Promise<OsuSnapshot[]> {
   console.log(`Fetching latest stats for mode: ${mode}`);
   
   // DISTINCT ON は Supabase では直接サポートされていないため、
@@ -65,7 +88,7 @@ export async function getAllLatestStats(mode: string = 'osu') {
   return data || [];
 }
 
-export async function getUserSnapshots(osuUserId: number, mode: string, limit: number = 50) {
+export async function getUserSnapshots(osuUserId: number, mode: string, limit: number = 50): Promise<OsuSnapshot[]> {
   console.log(`Fetching user snapshots for ${osuUserId} in ${mode} mode`);
   const { data, error } = await supabase
     .from('osu_user_snapshots')
@@ -82,7 +105,7 @@ export async function getUserSnapshots(osuUserId: number, mode: string, limit: n
   return data || [];
 }
 
-export async function getLatestUserStats(osuUserId: number, mode: string) {
+export async function getLatestUserStats(osuUserId: number, mode: string): Promise<OsuSnapshot | null> {
   console.log(`Fetching latest stats for user ${osuUserId} in ${mode} mode`);
   const { data, error } = await supabase
     .from('osu_user_snapshots')
@@ -100,7 +123,7 @@ export async function getLatestUserStats(osuUserId: number, mode: string) {
   return data;
 }
 
-export async function testSupabaseConnection() {
+export async function testSupabaseConnection(): Promise<boolean> {
   try {
     console.log('Testing Supabase connection...');
     const { data, error } = await supabase

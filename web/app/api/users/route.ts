@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     const latestStats = await getAllLatestStats(mode);
     console.log('Latest stats count:', latestStats.length);
     
-    const statsMap = new Map(latestStats.map(stat => [stat.osu_user_id, stat]));
+    const statsMap = new Map(latestStats.map((stat: any) => [stat.osu_user_id, stat]));
 
     // ユーザー情報を結合
     const usersWithStats = await Promise.allSettled(
