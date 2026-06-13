@@ -97,6 +97,8 @@ export default function UserCard({
   }, [estimator, osuUserId, mode, username, initialStats, isInitialized]);
 
   useEffect(() => {
+    if (!isInitialized) return; // 初期化完了まで待つ
+    
     let apiCallCount = 0;
     
     // API から最新データを取得
@@ -117,26 +119,34 @@ export default function UserCard({
           }, new Date());
           apiCallCount++;
           setNextApiUpdate(120); // カウントダウンをリセット
+          console.log(`[${username}] Next API update in 120 seconds`);
         }
       } catch (error) {
-        console.error('Failed to fetch latest data:', error);
+        console.error(`[${username}] Failed to fetch latest data:`, error);
       }
     };
 
-    // カウントダウンタイマー
+    // カウントダウンタイマー（毎秒減らす）
     const countdownInterval = setInterval(() => {
-      setNextApiUpdate(prev => Math.max(0, prev - 1));
+      setNextApiUpdate(prev => {
+        if (prev <= 0) {
+          return 120; // 0になったら120にリセット（次のAPI呼び出しに備える）
+        }
+        return prev - 1;
+      });
     }, 1000);
 
     // 2分ごとに実際のデータを取得して補正
     const apiInterval = setInterval(fetchLatestData, 2 * 60 * 1000);
-    fetchLatestData(); // 初回実行
+    
+    // 初回実行（即座に）
+    fetchLatestData();
 
     return () => {
       clearInterval(apiInterval);
       clearInterval(countdownInterval);
     };
-  }, [estimator, osuUserId, mode, username]);
+  }, [estimator, osuUserId, mode, username, isInitialized]);
 
   const trend = estimator.getTrend();
   const confidenceColor = confidence > 0.8 ? 'text-green-400' : 
