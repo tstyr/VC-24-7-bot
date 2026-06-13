@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
           const osuUser = await fetchOsuUser(user.osu_user_id, mode);
           avatarUrl = osuUser.avatar_url;
         } catch (error) {
-          console.warn(`Failed to fetch avatar for user ${user.osu_user_id}:`, error.message);
+          console.warn(`Failed to fetch avatar for user ${user.osu_user_id}:`, error instanceof Error ? error.message : 'Unknown error');
         }
 
         return {
@@ -88,14 +88,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(validUsers);
   } catch (error) {
     console.error('Failed to fetch users:', error);
-    console.error('Error stack:', error.stack);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     console.error('Database URL exists:', !!process.env.DATABASE_URL);
     console.error('OSU_CLIENT_ID exists:', !!process.env.OSU_CLIENT_ID);
     
     return NextResponse.json(
       { 
         error: 'Failed to fetch users', 
-        details: error.message,
+        details: error instanceof Error ? error.message : 'Unknown error',
         env_check: {
           database_url: !!process.env.DATABASE_URL,
           osu_client_id: !!process.env.OSU_CLIENT_ID,

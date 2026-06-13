@@ -36,7 +36,7 @@ export async function GET(
     return NextResponse.json(filteredSnapshots);
 
   } catch (error) {
-    console.error('Failed to fetch user history:', error);
+    console.error('Failed to fetch user history:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json(
       { error: 'Failed to fetch user history' },
       { status: 500 }

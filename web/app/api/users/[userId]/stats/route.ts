@@ -26,7 +26,7 @@ export async function GET(
     try {
       apiStats = await fetchOsuUser(userId, mode);
     } catch (error) {
-      console.error(`Failed to fetch API stats for user ${userId}:`, error);
+      console.error(`Failed to fetch API stats for user ${userId}:`, error instanceof Error ? error.message : 'Unknown error');
       
       // APIが失敗した場合はDBデータのみ返す
       if (dbStats) {
@@ -62,7 +62,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Failed to fetch user stats:', error);
+    console.error('Failed to fetch user stats:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json(
       { error: 'Failed to fetch user stats' },
       { status: 500 }
