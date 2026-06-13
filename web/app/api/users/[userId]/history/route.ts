@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserSnapshots } from '@/lib/db';
+import { getUserSnapshots } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
@@ -20,10 +20,10 @@ export async function GET(
       );
     }
 
-    // 指定時間範囲のスナップショットを取得
+    // 指定時間範囲のスナップショットを取得（Supabase経由）
     const snapshots = await getUserSnapshots(userId, mode, Math.min(hours * 3, 200)); // 最大200件
     
-    console.log(`[History API] Retrieved ${snapshots.length} snapshots from DB`);
+    console.log(`[History API] Retrieved ${snapshots.length} snapshots from Supabase`);
     
     // 指定時間以内のデータのみフィルタ
     const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -38,7 +38,15 @@ export async function GET(
       new Date(a.captured_at).getTime() - new Date(b.captured_at).getTime()
     );
 
-    return NextResponse.json(filteredSnapshots);
+    // created_at フィールドを追加（クライアント側の互換性のため）
+    const result = filteredSnapshots.map(snapshot => ({
+      ...snapshot,
+      created_at: snapshot.captured_at,
+      total_score: snapshot.total_score || 0,
+      accuracy: (snapshot as any).accuracy || 0
+    }));
+
+    return NextResponse.json(result);
 
   } catch (error) {
     console.error('[History API] Error:', error);
