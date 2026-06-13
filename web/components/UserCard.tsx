@@ -47,42 +47,48 @@ export default function UserCard({
 
     const initializeEstimator = async () => {
       try {
-        console.log(`[${username}] Loading historical data...`);
-        
-        // 過去24時間の履歴データを取得
-        const response = await fetch(`/api/users/${osuUserId}/history?mode=${mode}&hours=24`);
-        if (response.ok) {
-          const history = await response.json();
-          console.log(`[${username}] Loaded ${history.length} historical snapshots`);
-          
-          // 履歴データをEstimatorに追加
-          if (Array.isArray(history) && history.length > 0) {
-            history.forEach((snapshot: any) => {
-              estimator.addSnapshot({
-                pp: snapshot.pp,
-                global_rank: snapshot.global_rank,
-                country_rank: snapshot.country_rank,
-                play_count: snapshot.play_count,
-                total_score: snapshot.total_score,
-                accuracy: snapshot.accuracy
-              }, new Date(snapshot.created_at));
-            });
-            console.log(`[${username}] Estimator initialized with ${history.length} snapshots`);
-          }
-        }
+        console.log(`[${username}] Initializing estimator...`);
         
         // 初期統計がある場合は現在のデータポイントとして追加
         if (initialStats) {
+          console.log(`[${username}] Adding initial stats:`, initialStats);
           estimator.addSnapshot(initialStats, new Date());
+        }
+        
+        // 過去24時間の履歴データを取得
+        console.log(`[${username}] Loading historical data...`);
+        const response = await fetch(`/api/users/${osuUserId}/history?mode=${mode}&hours=24`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[${username}] History API failed:`, response.status, errorText);
+          throw new Error(`API returned ${response.status}: ${errorText}`);
+        }
+        
+        const history = await response.json();
+        console.log(`[${username}] Loaded ${history.length} historical snapshots`);
+        
+        // 履歴データをEstimatorに追加
+        if (Array.isArray(history) && history.length > 0) {
+          history.forEach((snapshot: any) => {
+            estimator.addSnapshot({
+              pp: snapshot.pp || 0,
+              global_rank: snapshot.global_rank || 0,
+              country_rank: snapshot.country_rank || 0,
+              play_count: snapshot.play_count || 0,
+              total_score: snapshot.total_score || 0,
+              accuracy: snapshot.accuracy || 0
+            }, new Date(snapshot.captured_at || snapshot.created_at));
+          });
+          console.log(`[${username}] Estimator initialized with ${history.length} snapshots`);
+        } else {
+          console.warn(`[${username}] No historical data available, using only current snapshot`);
         }
         
         setIsInitialized(true);
       } catch (error) {
         console.error(`[${username}] Failed to load historical data:`, error);
         // エラーでも初期化済みにして、初期統計のみで動作させる
-        if (initialStats) {
-          estimator.addSnapshot(initialStats, new Date());
-        }
         setIsInitialized(true);
       }
     };
