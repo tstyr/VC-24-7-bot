@@ -4,21 +4,51 @@ console.log('Initializing database connection...');
 console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
+// DATABASE_URLからホスト名を抽出してログ出力（デバッグ用）
+if (process.env.DATABASE_URL) {
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    console.log('Database host:', url.hostname);
+    console.log('Database port:', url.port);
+  } catch (e) {
+    console.error('Invalid DATABASE_URL format');
+  }
+}
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? {
     rejectUnauthorized: false
   } : false,
   // Vercel用の接続設定
-  max: 1, // Vercelでは接続数を制限
+  max: 3, // 接続数を増やす
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  connectionTimeoutMillis: 20000, // タイムアウトを長くする
+  // DNS解決の問題対策
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 });
 
 // Database connection test
 pool.on('error', (err) => {
   console.error('Database connection error:', err);
 });
+
+// 接続テスト関数
+export async function testDatabaseConnection(): Promise<boolean> {
+  try {
+    console.log('Testing database connection...');
+    const client = await pool.connect();
+    const result = await client.query('SELECT NOW() as current_time');
+    client.release();
+    console.log('Database connection successful:', result.rows[0]);
+    return true;
+  } catch (error) {
+    console.error('Database connection failed:', error.message);
+    console.error('Error details:', error);
+    return false;
+  }
+}
 
 export interface OsuUser {
   discord_id: string;

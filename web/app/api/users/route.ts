@@ -1,11 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTrackedUsers, getAllLatestStats } from '@/lib/db';
+import { getTrackedUsers, getAllLatestStats, testDatabaseConnection } from '@/lib/db';
 import { fetchOsuUser } from '@/lib/osu-api';
 
 export async function GET(request: NextRequest) {
   console.log('API /users called');
   
   try {
+    // まずデータベース接続をテスト
+    const dbConnected = await testDatabaseConnection();
+    if (!dbConnected) {
+      return NextResponse.json(
+        { 
+          error: 'Database connection failed',
+          env_check: {
+            database_url: !!process.env.DATABASE_URL,
+            osu_client_id: !!process.env.OSU_CLIENT_ID,
+            osu_client_secret: !!process.env.OSU_CLIENT_SECRET
+          }
+        },
+        { status: 500 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get('mode') || 'osu';
     console.log('Mode:', mode);
