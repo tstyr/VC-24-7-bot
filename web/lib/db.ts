@@ -20,10 +20,12 @@ export const pool = new Pool({
   ssl: {
     rejectUnauthorized: false
   },
-  // Supabase + Vercel用の接続設定
-  max: 1, // Supabaseは接続数制限が厳しい
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 60000, // Supabaseは時間がかかることがある
+  // Supabase Connection Pooling + Vercel用の設定
+  max: 1, // 厳格な接続数制限
+  min: 0, // 最小接続数
+  idleTimeoutMillis: 10000, // アイドルタイムアウトを短く
+  connectionTimeoutMillis: 30000,
+  acquireTimeoutMillis: 30000, // 接続取得タイムアウト
 });
 
 // Database connection test
