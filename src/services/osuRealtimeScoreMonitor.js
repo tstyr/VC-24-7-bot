@@ -306,6 +306,15 @@ async function monitorCycle(client) {
           log(`[キャッシュ確認] ${cacheKey} - 前回PP: ${previousStats?.pp || 'なし'}, 前回順位: ${previousStats?.global_rank || 'なし'}`, 'info');
           log(`[現在の統計] ${cacheKey} - 現在PP: ${userStats.pp}, 現在順位: ${userStats.global_rank}`, 'info');
           
+          // キャッシュがない場合は初期化（次回の比較用）
+          if (!previousStats) {
+            userStatsCache.set(cacheKey, {
+              pp: userStats.pp,
+              global_rank: userStats.global_rank
+            });
+            log(`[キャッシュ初期化] ${cacheKey} - PP: ${userStats.pp}, Rank: ${userStats.global_rank}`, 'info');
+          }
+          
           // 最新5件のスコアを取得（ユーザーIDを使用）
           const recentScores = await fetchRecentScores(osuUserId, mode, 5);
           
@@ -362,20 +371,21 @@ async function monitorCycle(client) {
 
             if (sent > 0) {
               scoreCount += 1;
-              
-              // スコア投稿成功後、現在の統計をキャッシュに保存
-              userStatsCache.set(cacheKey, {
-                pp: userStats.pp,
-                global_rank: userStats.global_rank
-              });
-              
-              log(`[キャッシュ更新] ${cacheKey} - PP: ${userStats.pp}, Rank: ${userStats.global_rank}`, 'success');
+              log(`[スコア投稿成功] ${cacheKey} - Score ID: ${score.id}`, 'success');
             } else {
               log(`[スコア投稿失敗] ${cacheKey} - チャンネルが見つからないか、ユーザーがメンバーではありません`, 'info');
             }
 
             processedScores.add(scoreKey);
           }
+          
+          // スコア処理後、最新の統計でキャッシュを更新（次回の比較用）
+          // これにより次のスコアで正確な差分が表示される
+          userStatsCache.set(cacheKey, {
+            pp: userStats.pp,
+            global_rank: userStats.global_rank
+          });
+          log(`[キャッシュ更新] ${cacheKey} - PP: ${userStats.pp}, Rank: ${userStats.global_rank}`, 'success');
         } catch (error) {
           log(`osu! リアルタイムスコア取得失敗: ${osuUsername} [${mode}] - ${error.message}`, 'error');
           log(`エラー詳細: discordId=${discordId}, osuUserId=${osuUserId}, osuUsername=${osuUsername}`, 'error');

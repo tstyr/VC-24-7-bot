@@ -95,11 +95,7 @@ export default function MiniChart({
         borderColor: color,
         borderWidth: 1,
         callbacks: {
-          label: (context) => {
-            const value = context.parsed.y;
-            if (value === null) return `${label}: N/A`;
-            return `${label}: ${formatValue(value)}`;
-          }
+          label: (context) => `${label}: ${formatValue(context.parsed.y ?? 0)}`
         }
       }
     },

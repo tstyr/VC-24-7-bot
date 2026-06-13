@@ -110,17 +110,24 @@ export class RealtimeEstimator {
 
     const now = targetTime || new Date();
     const lastSnapshot = this.snapshots[this.snapshots.length - 1];
-    const hoursElapsed = (now.getTime() - lastSnapshot.timestamp.getTime()) / (1000 * 60 * 60);
+    const secondsElapsed = (now.getTime() - lastSnapshot.timestamp.getTime()) / 1000; // 秒単位で計算
+    const hoursElapsed = secondsElapsed / 3600;
 
     // 2時間以上経過している場合は信頼度を下げる
     const timeDecay = Math.max(0, 1 - (hoursElapsed / 2));
     const confidence = this.estimation.confidence * timeDecay;
 
-    // 統計の推定
-    const estimatedPp = Math.max(0, lastSnapshot.stats.pp + (this.estimation.trend.pp_per_hour * hoursElapsed));
-    const estimatedRank = Math.max(1, Math.round(lastSnapshot.stats.global_rank - (this.estimation.trend.rank_change_per_hour * hoursElapsed)));
-    const estimatedPlays = Math.max(lastSnapshot.stats.play_count, Math.round(lastSnapshot.stats.play_count + (this.estimation.trend.plays_per_hour * hoursElapsed)));
-    const estimatedScore = Math.max(lastSnapshot.stats.total_score, Math.round(lastSnapshot.stats.total_score + (this.estimation.trend.score_per_hour * hoursElapsed))); // 追加
+    // 統計の推定（毎秒増加）
+    // 1時間あたりの変化率を秒あたりに変換
+    const ppPerSecond = this.estimation.trend.pp_per_hour / 3600;
+    const rankPerSecond = this.estimation.trend.rank_change_per_hour / 3600;
+    const playsPerSecond = this.estimation.trend.plays_per_hour / 3600;
+    const scorePerSecond = this.estimation.trend.score_per_hour / 3600;
+
+    const estimatedPp = Math.max(0, lastSnapshot.stats.pp + (ppPerSecond * secondsElapsed));
+    const estimatedRank = Math.max(1, Math.round(lastSnapshot.stats.global_rank - (rankPerSecond * secondsElapsed)));
+    const estimatedPlays = Math.max(lastSnapshot.stats.play_count, Math.round(lastSnapshot.stats.play_count + (playsPerSecond * secondsElapsed)));
+    const estimatedScore = Math.max(lastSnapshot.stats.total_score, Math.round(lastSnapshot.stats.total_score + (scorePerSecond * secondsElapsed)));
 
     return {
       estimated: {
@@ -128,7 +135,7 @@ export class RealtimeEstimator {
         pp: estimatedPp,
         global_rank: estimatedRank,
         play_count: estimatedPlays,
-        total_score: estimatedScore // 追加
+        total_score: estimatedScore
       },
       confidence,
       lastUpdate: now,
@@ -143,7 +150,7 @@ export class RealtimeEstimator {
     // 補正前の推定値を取得
     const beforeCorrection = this.getEstimation(timestamp);
     
-    // 実データを追加
+    // 実データを新しい基準点として追加（ここから再び増加を開始）
     this.addSnapshot(realStats, timestamp);
     
     // 推定精度を計算して補正係数を調整
@@ -161,18 +168,19 @@ export class RealtimeEstimator {
         this.correctionFactor = Math.max(0.5, this.correctionFactor - 0.05);
       }
       
-      console.log('API Correction:', {
-        ppError: ppError.toFixed(4),
-        scoreError: scoreError.toFixed(4),
-        correctionFactor: this.correctionFactor.toFixed(3),
-        ppDiff: realStats.pp - beforeCorrection.estimated.pp,
-        rankDiff: realStats.global_rank - beforeCorrection.estimated.global_rank,
-        playsDiff: realStats.play_count - beforeCorrection.estimated.play_count,
-        scoreDiff: realStats.total_score - beforeCorrection.estimated.total_score
+      console.log('API Correction - New baseline set:', {
+        timestamp: timestamp.toLocaleTimeString(),
+        actualPP: realStats.pp,
+        estimatedPP: beforeCorrection.estimated.pp.toFixed(2),
+        actualScore: realStats.total_score.toLocaleString(),
+        estimatedScore: beforeCorrection.estimated.total_score.toLocaleString(),
+        ppError: (ppError * 100).toFixed(2) + '%',
+        scoreError: (scoreError * 100).toFixed(2) + '%',
+        correctionFactor: this.correctionFactor.toFixed(3)
       });
     }
     
-    // トレンドを再計算
+    // トレンドを再計算（新しい基準点から増加を再開）
     this.calculateTrends();
   }
 

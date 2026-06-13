@@ -67,7 +67,10 @@ export interface OsuSnapshot {
   country_rank: number;
   play_time_seconds: number;
   play_count: number;
+  total_score: number;
+  accuracy: number;
   captured_at: string;
+  created_at?: string; // エイリアス
 }
 
 export interface OsuBestScore {
@@ -109,7 +112,14 @@ export async function getUserSnapshots(
   const client = await pool.connect();
   try {
     const result = await client.query(`
-      SELECT * FROM osu_user_snapshots 
+      SELECT 
+        id, discord_id, osu_user_id, osu_username, mode,
+        pp, global_rank, country_rank, play_time_seconds, play_count,
+        COALESCE(total_score, 0) as total_score,
+        COALESCE(accuracy, 0) as accuracy,
+        captured_at,
+        captured_at as created_at
+      FROM osu_user_snapshots 
       WHERE osu_user_id = $1 AND mode = $2 
       ORDER BY captured_at DESC 
       LIMIT $3
@@ -124,7 +134,14 @@ export async function getLatestUserStats(osuUserId: number, mode: string): Promi
   const client = await pool.connect();
   try {
     const result = await client.query(`
-      SELECT * FROM osu_user_snapshots 
+      SELECT 
+        id, discord_id, osu_user_id, osu_username, mode,
+        pp, global_rank, country_rank, play_time_seconds, play_count,
+        COALESCE(total_score, 0) as total_score,
+        COALESCE(accuracy, 0) as accuracy,
+        captured_at,
+        captured_at as created_at
+      FROM osu_user_snapshots 
       WHERE osu_user_id = $1 AND mode = $2 
       ORDER BY captured_at DESC 
       LIMIT 1
@@ -139,7 +156,13 @@ export async function getAllLatestStats(mode: string = 'osu'): Promise<OsuSnapsh
   const client = await pool.connect();
   try {
     const result = await client.query(`
-      SELECT DISTINCT ON (osu_user_id) *
+      SELECT DISTINCT ON (osu_user_id)
+        id, discord_id, osu_user_id, osu_username, mode,
+        pp, global_rank, country_rank, play_time_seconds, play_count,
+        COALESCE(total_score, 0) as total_score,
+        COALESCE(accuracy, 0) as accuracy,
+        captured_at,
+        captured_at as created_at
       FROM osu_user_snapshots 
       WHERE mode = $1 
       ORDER BY osu_user_id, captured_at DESC

@@ -35,8 +35,8 @@ export async function GET(
           global_rank: dbStats.global_rank || 0,
           country_rank: dbStats.country_rank || 0,
           play_count: dbStats.play_count || 0,
-          total_score: 0,
-          accuracy: 0,
+          total_score: dbStats.total_score || 0,
+          accuracy: dbStats.accuracy || 0,
           source: 'database',
           last_updated: dbStats.captured_at
         });

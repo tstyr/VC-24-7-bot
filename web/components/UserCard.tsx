@@ -21,19 +21,12 @@ export default function UserCard({
   initialStats,
   avatarUrl 
 }: UserCardProps) {
-  const [estimator] = useState(() => {
-    if (initialStats) {
-      return new RealtimeEstimator([{
-        stats: initialStats,
-        timestamp: new Date()
-      }]);
-    }
-    return new RealtimeEstimator();
-  });
-
+  const [estimator] = useState(() => new RealtimeEstimator());
   const [currentStats, setCurrentStats] = useState<UserStats | null>(initialStats || null);
   const [confidence, setConfidence] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [nextApiUpdate, setNextApiUpdate] = useState<number>(120); // 2分=120秒
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -48,13 +41,66 @@ export default function UserCard({
     return () => clearInterval(interval);
   }, [estimator]);
 
+  // 初期化: 履歴データを取得してEstimatorに渡す
   useEffect(() => {
+    if (isInitialized) return;
+
+    const initializeEstimator = async () => {
+      try {
+        console.log(`[${username}] Loading historical data...`);
+        
+        // 過去24時間の履歴データを取得
+        const response = await fetch(`/api/users/${osuUserId}/history?mode=${mode}&hours=24`);
+        if (response.ok) {
+          const history = await response.json();
+          console.log(`[${username}] Loaded ${history.length} historical snapshots`);
+          
+          // 履歴データをEstimatorに追加
+          if (Array.isArray(history) && history.length > 0) {
+            history.forEach((snapshot: any) => {
+              estimator.addSnapshot({
+                pp: snapshot.pp,
+                global_rank: snapshot.global_rank,
+                country_rank: snapshot.country_rank,
+                play_count: snapshot.play_count,
+                total_score: snapshot.total_score,
+                accuracy: snapshot.accuracy
+              }, new Date(snapshot.created_at));
+            });
+            console.log(`[${username}] Estimator initialized with ${history.length} snapshots`);
+          }
+        }
+        
+        // 初期統計がある場合は現在のデータポイントとして追加
+        if (initialStats) {
+          estimator.addSnapshot(initialStats, new Date());
+        }
+        
+        setIsInitialized(true);
+      } catch (error) {
+        console.error(`[${username}] Failed to load historical data:`, error);
+        // エラーでも初期化済みにして、初期統計のみで動作させる
+        if (initialStats) {
+          estimator.addSnapshot(initialStats, new Date());
+        }
+        setIsInitialized(true);
+      }
+    };
+
+    initializeEstimator();
+  }, [estimator, osuUserId, mode, username, initialStats, isInitialized]);
+
+  useEffect(() => {
+    let apiCallCount = 0;
+    
     // API から最新データを取得
     const fetchLatestData = async () => {
       try {
+        console.log(`[${username}] Fetching API update #${apiCallCount + 1}...`);
         const response = await fetch(`/api/users/${osuUserId}/stats?mode=${mode}`);
         if (response.ok) {
           const realData = await response.json();
+          console.log(`[${username}] API correction applied - Score: ${realData.total_score.toLocaleString()}`);
           estimator.correctWithRealData({
             pp: realData.pp,
             global_rank: realData.global_rank,
@@ -63,18 +109,28 @@ export default function UserCard({
             total_score: realData.total_score,
             accuracy: realData.accuracy
           }, new Date());
+          apiCallCount++;
+          setNextApiUpdate(120); // カウントダウンをリセット
         }
       } catch (error) {
         console.error('Failed to fetch latest data:', error);
       }
     };
 
+    // カウントダウンタイマー
+    const countdownInterval = setInterval(() => {
+      setNextApiUpdate(prev => Math.max(0, prev - 1));
+    }, 1000);
+
     // 2分ごとに実際のデータを取得して補正
     const apiInterval = setInterval(fetchLatestData, 2 * 60 * 1000);
     fetchLatestData(); // 初回実行
 
-    return () => clearInterval(apiInterval);
-  }, [estimator, osuUserId, mode]);
+    return () => {
+      clearInterval(apiInterval);
+      clearInterval(countdownInterval);
+    };
+  }, [estimator, osuUserId, mode, username]);
 
   const trend = estimator.getTrend();
   const confidenceColor = confidence > 0.8 ? 'text-green-400' : 
@@ -194,7 +250,15 @@ export default function UserCard({
       {/* 合計スコアのリアルタイム推移グラフ */}
       <div className="mt-4 p-3 bg-gray-800 rounded-lg">
         <div className="flex justify-between items-center mb-2">
-          <div className="text-sm font-medium text-gray-300">Total Score (Live)</div>
+          <div className="text-sm font-medium text-gray-300 flex items-center">
+            Total Score (Live)
+            {trend.score_per_hour > 0 && (
+              <span className="ml-2 text-xs text-green-400 flex items-center">
+                <TrendingUp className="w-3 h-3 mr-1" />
+                +{formatNumber(Math.round(trend.score_per_hour / 3600))}/sec
+              </span>
+            )}
+          </div>
           <div className="text-lg font-bold text-osu-purple animate-counter font-mono">
             {currentStats.total_score ? currentStats.total_score.toLocaleString() : 'N/A'}
           </div>
@@ -206,12 +270,24 @@ export default function UserCard({
           formatValue={(v) => v.toLocaleString()}
           maxPoints={30}
         />
+        <div className="mt-2 text-xs text-gray-500 flex justify-between">
+          <span>毎秒リアルタイム更新</span>
+          <span>次のAPI補正: {nextApiUpdate}秒後</span>
+        </div>
       </div>
 
       {/* PP推移のリアルタイムグラフ */}
       <div className="mt-3 p-3 bg-gray-800 rounded-lg">
         <div className="flex justify-between items-center mb-2">
-          <div className="text-sm font-medium text-gray-300">PP Trend (Live)</div>
+          <div className="text-sm font-medium text-gray-300 flex items-center">
+            PP Trend (Live)
+            {trend.pp_per_hour > 0 && (
+              <span className="ml-2 text-xs text-green-400 flex items-center">
+                <TrendingUp className="w-3 h-3 mr-1" />
+                +{(trend.pp_per_hour / 3600).toFixed(3)}/sec
+              </span>
+            )}
+          </div>
           <div className="text-lg font-bold text-osu-pink animate-counter">
             {currentStats.pp.toFixed(2)}pp
           </div>
