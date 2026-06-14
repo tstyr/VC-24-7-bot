@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { RealtimeEstimator, UserStats } from '@/lib/realtime-estimator';
 import { formatNumber } from '@/lib/osu-api';
 import { TrendingUp, TrendingDown, User, Clock } from 'lucide-react';
@@ -163,7 +164,10 @@ export default function UserCard({
   return (
     <div className="card p-6 hover:glow transition-all duration-300">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-4">
+        <Link 
+          href={`/users/${osuUserId}`}
+          className="flex items-center space-x-4 cursor-pointer hover:opacity-80 transition-opacity"
+        >
           {avatarUrl ? (
             <img 
               src={avatarUrl} 
@@ -176,7 +180,7 @@ export default function UserCard({
             </div>
           )}
           <div>
-            <h3 className="text-xl font-bold text-gradient">{username}</h3>
+            <h3 className="text-xl font-bold text-gradient hover:underline">{username}</h3>
             <p className="text-gray-400 text-sm">
               {mode === 'osu' ? 'osu!' : 
                mode === 'taiko' ? 'osu!taiko' : 
@@ -184,7 +188,7 @@ export default function UserCard({
                'osu!mania'}
             </p>
           </div>
-        </div>
+        </Link>
         
         <div className="flex items-center space-x-2 text-sm">
           <Clock className="w-4 h-4" />
