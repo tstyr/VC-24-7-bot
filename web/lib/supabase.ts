@@ -143,3 +143,62 @@ export async function testSupabaseConnection(): Promise<boolean> {
     return false;
   }
 }
+
+// 増加率の型定義
+export interface GrowthRate {
+  osu_user_id: number;
+  mode: string;
+  pp_per_hour: number;
+  rank_change_per_hour: number;
+  score_per_hour: number;
+  plays_per_hour: number;
+  confidence: number;
+  data_points: number;
+  last_calculated_at: string;
+  updated_at: string;
+}
+
+// 増加率を取得
+export async function getGrowthRate(osuUserId: number, mode: string): Promise<GrowthRate | null> {
+  console.log(`Fetching growth rate for user ${osuUserId} in ${mode} mode`);
+  const { data, error } = await supabase
+    .from('osu_growth_rates')
+    .select('*')
+    .eq('osu_user_id', osuUserId)
+    .eq('mode', mode)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Failed to fetch growth rate:', error);
+    return null;
+  }
+
+  return data;
+}
+
+// 増加率を保存/更新
+export async function saveGrowthRate(growthRate: Omit<GrowthRate, 'last_calculated_at' | 'updated_at'>): Promise<boolean> {
+  console.log(`Saving growth rate for user ${growthRate.osu_user_id} in ${growthRate.mode} mode`);
+  const { error } = await supabase
+    .from('osu_growth_rates')
+    .upsert({
+      osu_user_id: growthRate.osu_user_id,
+      mode: growthRate.mode,
+      pp_per_hour: growthRate.pp_per_hour,
+      rank_change_per_hour: growthRate.rank_change_per_hour,
+      score_per_hour: growthRate.score_per_hour,
+      plays_per_hour: growthRate.plays_per_hour,
+      confidence: growthRate.confidence,
+      data_points: growthRate.data_points,
+      last_calculated_at: new Date().toISOString()
+    }, {
+      onConflict: 'osu_user_id,mode'
+    });
+
+  if (error) {
+    console.error('Failed to save growth rate:', error);
+    return false;
+  }
+
+  return true;
+}

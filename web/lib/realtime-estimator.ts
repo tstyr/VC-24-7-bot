@@ -219,4 +219,33 @@ export class RealtimeEstimator {
       score_per_hour: 0 // 追加
     };
   }
+
+  // DBから増加率を設定
+  setTrendFromDB(trend: {
+    pp_per_hour: number;
+    rank_change_per_hour: number;
+    plays_per_hour: number;
+    score_per_hour: number;
+  }, confidence: number) {
+    if (this.snapshots.length === 0) {
+      console.warn('[Estimator] Cannot set trend without snapshots');
+      return;
+    }
+
+    const lastSnapshot = this.snapshots[this.snapshots.length - 1];
+    
+    this.estimation = {
+      estimated: { ...lastSnapshot.stats },
+      confidence,
+      lastUpdate: lastSnapshot.timestamp,
+      trend: {
+        pp_per_hour: trend.pp_per_hour * this.correctionFactor,
+        rank_change_per_hour: trend.rank_change_per_hour * this.correctionFactor,
+        plays_per_hour: trend.plays_per_hour * this.correctionFactor,
+        score_per_hour: trend.score_per_hour * this.correctionFactor
+      }
+    };
+
+    console.log('[Estimator] Trend set from DB:', this.estimation.trend);
+  }
 }

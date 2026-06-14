@@ -5,6 +5,7 @@ import { RealtimeEstimator, UserStats } from '@/lib/realtime-estimator';
 import { formatNumber } from '@/lib/osu-api';
 import { TrendingUp, TrendingDown, User, Clock } from 'lucide-react';
 import MiniChart from './MiniChart';
+import AnimatedNumber from './AnimatedNumber';
 
 interface UserCardProps {
   username: string;
@@ -23,6 +24,7 @@ export default function UserCard({
 }: UserCardProps) {
   const [estimator] = useState(() => new RealtimeEstimator());
   const [currentStats, setCurrentStats] = useState<UserStats | null>(initialStats || null);
+  const [previousStats, setPreviousStats] = useState<UserStats | null>(initialStats || null);
   const [confidence, setConfidence] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [nextApiUpdate, setNextApiUpdate] = useState<number>(120); // 2分=120秒
@@ -32,6 +34,7 @@ export default function UserCard({
     const interval = setInterval(() => {
       const estimation = estimator.getEstimation();
       if (estimation) {
+        setPreviousStats(currentStats); // 前の値を保存
         setCurrentStats(estimation.estimated);
         setConfidence(estimation.confidence);
         setLastUpdate(estimation.lastUpdate);
@@ -39,9 +42,9 @@ export default function UserCard({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [estimator]);
+  }, [estimator, currentStats]);
 
-  // 初期化: 履歴データを取得してEstimatorに渡す
+  // 初期化: DBから増加率を取得してEstimatorに設定
   useEffect(() => {
     if (isInitialized) return;
 
@@ -55,40 +58,31 @@ export default function UserCard({
           estimator.addSnapshot(initialStats, new Date());
         }
         
-        // 過去24時間の履歴データを取得
-        console.log(`[${username}] Loading historical data...`);
-        const response = await fetch(`/api/users/${osuUserId}/history?mode=${mode}&hours=24`);
+        // DBから保存された増加率を取得
+        console.log(`[${username}] Loading growth rate from DB...`);
+        const growthResponse = await fetch(`/api/growth-rates/${osuUserId}?mode=${mode}`);
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`[${username}] History API failed:`, response.status, errorText);
-          throw new Error(`API returned ${response.status}: ${errorText}`);
-        }
-        
-        const history = await response.json();
-        console.log(`[${username}] Loaded ${history.length} historical snapshots`);
-        
-        // 履歴データをEstimatorに追加
-        if (Array.isArray(history) && history.length > 0) {
-          history.forEach((snapshot: any) => {
-            estimator.addSnapshot({
-              pp: snapshot.pp || 0,
-              global_rank: snapshot.global_rank || 0,
-              country_rank: snapshot.country_rank || 0,
-              play_count: snapshot.play_count || 0,
-              total_score: snapshot.total_score || 0,
-              accuracy: snapshot.accuracy || 0
-            }, new Date(snapshot.captured_at || snapshot.created_at));
-          });
-          console.log(`[${username}] Estimator initialized with ${history.length} snapshots`);
+        if (growthResponse.ok) {
+          const growthRate = await growthResponse.json();
+          console.log(`[${username}] Loaded growth rate:`, growthRate);
+          
+          // 増加率をEstimatorに設定
+          if (growthRate.data_points >= 2) {
+            estimator.setTrendFromDB({
+              pp_per_hour: growthRate.pp_per_hour,
+              rank_change_per_hour: growthRate.rank_change_per_hour,
+              plays_per_hour: growthRate.plays_per_hour,
+              score_per_hour: growthRate.score_per_hour
+            }, growthRate.confidence);
+            console.log(`[${username}] Applied saved growth rate`);
+          }
         } else {
-          console.warn(`[${username}] No historical data available, using only current snapshot`);
+          console.warn(`[${username}] Failed to load growth rate from DB`);
         }
         
         setIsInitialized(true);
       } catch (error) {
-        console.error(`[${username}] Failed to load historical data:`, error);
-        // エラーでも初期化済みにして、初期統計のみで動作させる
+        console.error(`[${username}] Failed to initialize:`, error);
         setIsInitialized(true);
       }
     };
@@ -202,8 +196,13 @@ export default function UserCard({
 
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div className="text-center">
-          <div className="text-2xl font-bold animate-counter text-osu-pink">
-            {currentStats.pp.toFixed(2)}
+          <div className="text-2xl font-bold">
+            <AnimatedNumber
+              value={currentStats.pp}
+              previousValue={previousStats?.pp}
+              format={(v) => v.toFixed(2)}
+              className="font-bold"
+            />
           </div>
           <div className="text-sm text-gray-400">PP</div>
           {trend.pp_per_hour !== 0 && (
@@ -217,8 +216,13 @@ export default function UserCard({
         </div>
 
         <div className="text-center">
-          <div className="text-2xl font-bold animate-counter text-osu-blue">
-            #{formatNumber(currentStats.global_rank)}
+          <div className="text-2xl font-bold">
+            #<AnimatedNumber
+              value={currentStats.global_rank}
+              previousValue={previousStats?.global_rank}
+              format={(v) => formatNumber(v)}
+              className="font-bold"
+            />
           </div>
           <div className="text-sm text-gray-400">Global Rank</div>
           {trend.rank_change_per_hour !== 0 && (
@@ -234,8 +238,12 @@ export default function UserCard({
 
       <div className="grid grid-cols-3 gap-2 text-sm">
         <div className="text-center">
-          <div className="font-semibold animate-counter">
-            {formatNumber(currentStats.play_count)}
+          <div className="font-semibold">
+            <AnimatedNumber
+              value={currentStats.play_count}
+              previousValue={previousStats?.play_count}
+              format={(v) => formatNumber(v)}
+            />
           </div>
           <div className="text-gray-400 text-xs">Plays</div>
           {trend.plays_per_hour !== 0 && (
@@ -256,8 +264,12 @@ export default function UserCard({
         </div>
         
         <div className="text-center">
-          <div className="font-semibold animate-counter text-osu-purple">
-            {currentStats.total_score ? formatNumber(currentStats.total_score) : 'N/A'}
+          <div className="font-semibold">
+            <AnimatedNumber
+              value={currentStats.total_score}
+              previousValue={previousStats?.total_score}
+              format={(v) => formatNumber(v)}
+            />
           </div>
           <div className="text-gray-400 text-xs">Total Score</div>
         </div>
@@ -275,8 +287,13 @@ export default function UserCard({
               </span>
             )}
           </div>
-          <div className="text-lg font-bold text-osu-purple animate-counter font-mono">
-            {currentStats.total_score ? currentStats.total_score.toLocaleString() : 'N/A'}
+          <div className="text-lg font-bold font-mono">
+            <AnimatedNumber
+              value={currentStats.total_score || 0}
+              previousValue={previousStats?.total_score}
+              format={(v) => v.toLocaleString()}
+              className="font-mono font-bold"
+            />
           </div>
         </div>
         <MiniChart
@@ -304,8 +321,13 @@ export default function UserCard({
               </span>
             )}
           </div>
-          <div className="text-lg font-bold text-osu-pink animate-counter">
-            {currentStats.pp.toFixed(2)}pp
+          <div className="text-lg font-bold">
+            <AnimatedNumber
+              value={currentStats.pp}
+              previousValue={previousStats?.pp}
+              format={(v) => `${v.toFixed(2)}pp`}
+              className="font-bold"
+            />
           </div>
         </div>
         <MiniChart
@@ -321,8 +343,13 @@ export default function UserCard({
       <div className="mt-3 p-3 bg-gray-800 rounded-lg">
         <div className="flex justify-between items-center mb-2">
           <div className="text-sm font-medium text-gray-300">Rank Trend (Live)</div>
-          <div className="text-lg font-bold text-osu-blue animate-counter">
-            #{formatNumber(currentStats.global_rank)}
+          <div className="text-lg font-bold">
+            #<AnimatedNumber
+              value={currentStats.global_rank}
+              previousValue={previousStats?.global_rank}
+              format={(v) => formatNumber(v)}
+              className="font-bold"
+            />
           </div>
         </div>
         <MiniChart
