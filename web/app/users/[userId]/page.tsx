@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowLeft, RotateCcw } from 'lucide-react';
 import AnimatedNumber from '@/components/AnimatedNumber';
 import { formatNumber } from '@/lib/osu-api';
 import { RealtimeEstimator, UserStats } from '@/lib/realtime-estimator';
@@ -24,6 +24,7 @@ interface HistoricalData {
 }
 
 type GraphType = 'score' | 'rank' | 'pp';
+type TimeRange = '1h' | '6h' | '24h' | '7d' | '30d';
 
 export default function UserDetailPage() {
   const params = useParams();
@@ -36,6 +37,7 @@ export default function UserDetailPage() {
   const [previousStats, setPreviousStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [graphType, setGraphType] = useState<GraphType>('score');
+  const [timeRange, setTimeRange] = useState<TimeRange>('24h');
   const [mode] = useState('osu');
 
   // 毎秒推定値を更新
@@ -64,6 +66,39 @@ export default function UserDetailPage() {
 
     return () => clearInterval(interval);
   }, [estimator, currentStats]);
+
+  // 履歴データを取得する関数
+  const fetchHistoryData = async (hours: number) => {
+    try {
+      const historyResponse = await fetch(`/api/users/${userId}/history?mode=${mode}&hours=${hours}`);
+      if (historyResponse.ok) {
+        const historyData = await historyResponse.json();
+        setHistory(historyData);
+        setRealtimeHistory([]); // リセット時はリアルタイムデータをクリア
+        console.log(`[Detail Page] Loaded ${historyData.length} historical snapshots for ${hours}h range`);
+      }
+    } catch (error) {
+      console.error('[Detail Page] Failed to fetch history data:', error);
+    }
+  };
+
+  // グラフをリセット
+  const handleResetGraph = () => {
+    console.log('[Detail Page] Resetting graph...');
+    setRealtimeHistory([]);
+    fetchHistoryData(getHoursFromTimeRange(timeRange));
+  };
+
+  // TimeRangeから時間数を取得
+  const getHoursFromTimeRange = (range: TimeRange): number => {
+    switch (range) {
+      case '1h': return 1;
+      case '6h': return 6;
+      case '24h': return 24;
+      case '7d': return 24 * 7;
+      case '30d': return 24 * 30;
+    }
+  };
 
   // 初期化とデータ取得
   useEffect(() => {
@@ -107,13 +142,7 @@ export default function UserDetailPage() {
         }
 
         // 履歴データを取得
-        const historyResponse = await fetch(`/api/users/${userId}/history?mode=${mode}&hours=720`);
-        if (historyResponse.ok) {
-          const historyData = await historyResponse.json();
-          setHistory(historyData);
-          setRealtimeHistory(historyData.slice(-60)); // 最新60件
-          console.log(`[Detail Page] Loaded ${historyData.length} historical snapshots`);
-        }
+        await fetchHistoryData(getHoursFromTimeRange(timeRange));
 
         setLoading(false);
       } catch (error) {
@@ -124,6 +153,13 @@ export default function UserDetailPage() {
 
     fetchUserData();
   }, [userId, mode, estimator]);
+
+  // TimeRange変更時に履歴データを再取得
+  useEffect(() => {
+    if (!loading && userData) {
+      fetchHistoryData(getHoursFromTimeRange(timeRange));
+    }
+  }, [timeRange]);
 
   // 20秒ごとに最新データを取得してEstimatorを補正
   useEffect(() => {
@@ -324,7 +360,7 @@ export default function UserDetailPage() {
         </div>
 
         {/* グラフ切り替えボタン */}
-        <div className="flex justify-center space-x-4 mb-6">
+        <div className="flex justify-center items-center space-x-4 mb-4">
           <button
             onClick={() => setGraphType('score')}
             className={`px-6 py-2 rounded-lg font-semibold transition-all ${
@@ -357,63 +393,131 @@ export default function UserDetailPage() {
           </button>
         </div>
 
+        {/* 時間範囲選択と リセットボタン */}
+        <div className="flex justify-center items-center space-x-4 mb-6">
+          <div className="flex space-x-2">
+            {(['1h', '6h', '24h', '7d', '30d'] as TimeRange[]).map(range => (
+              <button
+                key={range}
+                onClick={() => setTimeRange(range)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  timeRange === range
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
+          
+          <button
+            onClick={handleResetGraph}
+            className="flex items-center space-x-2 px-4 py-1.5 rounded-md text-sm font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition-all"
+            title="グラフをリセット"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>リセット</span>
+          </button>
+        </div>
+
         {/* グラフ */}
         {graphData.length > 0 && (
           <div className="bg-gray-800/50 rounded-lg p-6">
             <h2 className="text-2xl font-bold mb-6 text-center">{getGraphLabel()} Growth (Realtime)</h2>
-            <div className="relative h-64">
-              <svg className="w-full h-full" viewBox="0 0 1000 250">
-                {/* グリッドライン */}
-                {[0, 1, 2, 3, 4].map(i => (
-                  <line
-                    key={i}
-                    x1="0"
-                    y1={i * 50 + 25}
-                    x2="1000"
-                    y2={i * 50 + 25}
-                    stroke="#374151"
-                    strokeWidth="1"
-                  />
-                ))}
+            <div className="relative h-80">
+              <svg className="w-full h-full" viewBox="0 0 1000 320">
+                {(() => {
+                  const values = graphData.map(getGraphValue);
+                  const maxValue = Math.max(...values);
+                  const minValue = Math.min(...values);
+                  const range = maxValue - minValue || 1;
+                  
+                  // Y軸の余白を追加（上下10%）
+                  const padding = range * 0.1;
+                  const paddedMax = maxValue + padding;
+                  const paddedMin = minValue - padding;
+                  const paddedRange = paddedMax - paddedMin;
+                  
+                  // Y軸のラベル（5段階）
+                  const yLabels = [0, 1, 2, 3, 4].map(i => {
+                    const value = paddedMax - (paddedRange * i / 4);
+                    return {
+                      y: 20 + (i * 60),
+                      value: graphType === 'rank' ? Math.round(value) : Math.round(value)
+                    };
+                  });
 
-                {/* データライン */}
-                <polyline
-                  fill="none"
-                  stroke={graphType === 'score' ? '#8B5CF6' : graphType === 'rank' ? '#3B82F6' : '#EC4899'}
-                  strokeWidth="3"
-                  points={graphData.map((point, index) => {
-                    const x = (index / (graphData.length - 1)) * 1000;
-                    const values = graphData.map(getGraphValue);
-                    const maxValue = Math.max(...values);
-                    const minValue = Math.min(...values);
-                    const range = maxValue - minValue || 1;
-                    const normalizedValue = (getGraphValue(point) - minValue) / range;
-                    // ランクは逆転（小さいほど良い）
-                    const y = graphType === 'rank' 
-                      ? 25 + (normalizedValue * 200)
-                      : 225 - (normalizedValue * 200);
-                    return `${x},${y}`;
-                  }).join(' ')}
-                />
-
-                {/* X軸ラベル */}
-                {graphData.filter((_, i) => i % Math.ceil(graphData.length / 5) === 0).map((point, index) => {
-                  const i = graphData.indexOf(point);
-                  const x = (i / (graphData.length - 1)) * 1000;
-                  const date = new Date(point.captured_at);
                   return (
-                    <text
-                      key={index}
-                      x={x}
-                      y="245"
-                      fill="#9CA3AF"
-                      fontSize="12"
-                      textAnchor="middle"
-                    >
-                      {date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })}
-                    </text>
+                    <>
+                      {/* グリッドライン */}
+                      {yLabels.map((label, i) => (
+                        <g key={i}>
+                          <line
+                            x1="50"
+                            y1={label.y}
+                            x2="1000"
+                            y2={label.y}
+                            stroke="#374151"
+                            strokeWidth="1"
+                          />
+                          <text
+                            x="45"
+                            y={label.y + 4}
+                            fill="#9CA3AF"
+                            fontSize="12"
+                            textAnchor="end"
+                          >
+                            {graphType === 'rank' 
+                              ? `#${label.value.toLocaleString()}` 
+                              : label.value.toLocaleString()}
+                          </text>
+                        </g>
+                      ))}
+
+                      {/* データライン */}
+                      <polyline
+                        fill="none"
+                        stroke={graphType === 'score' ? '#8B5CF6' : graphType === 'rank' ? '#3B82F6' : '#EC4899'}
+                        strokeWidth="3"
+                        points={graphData.map((point, index) => {
+                          const x = 50 + ((index / (graphData.length - 1)) * 950);
+                          const value = getGraphValue(point);
+                          const normalizedValue = (value - paddedMin) / paddedRange;
+                          // ランクは逆転（小さいほど良い）
+                          const y = graphType === 'rank' 
+                            ? 20 + (normalizedValue * 240)
+                            : 260 - (normalizedValue * 240);
+                          return `${x},${y}`;
+                        }).join(' ')}
+                      />
+
+                      {/* X軸ラベル */}
+                      {graphData.filter((_, i) => i % Math.ceil(graphData.length / 8) === 0).map((point, index) => {
+                        const i = graphData.indexOf(point);
+                        const x = 50 + ((i / (graphData.length - 1)) * 950);
+                        const date = new Date(point.captured_at);
+                        return (
+                          <text
+                            key={index}
+                            x={x}
+                            y="295"
+                            fill="#9CA3AF"
+                            fontSize="11"
+                            textAnchor="middle"
+                          >
+                            {date.toLocaleDateString('ja-JP', { 
+                              month: 'numeric', 
+                              day: 'numeric', 
+                              hour: 'numeric', 
+                              minute: 'numeric' 
+                            })}
+                          </text>
+                        );
+                      })}
+                    </>
                   );
-                })}
+                })()}
               </svg>
             </div>
             <div className="mt-4 text-center text-sm text-gray-500">
