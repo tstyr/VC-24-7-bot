@@ -27,7 +27,7 @@ export default function UserCard({
   const [previousStats, setPreviousStats] = useState<UserStats | null>(initialStats || null);
   const [confidence, setConfidence] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-  const [nextApiUpdate, setNextApiUpdate] = useState<number>(120); // 2分=120秒
+  const [nextApiUpdate, setNextApiUpdate] = useState<number>(20); // 20秒
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
@@ -112,8 +112,8 @@ export default function UserCard({
             accuracy: realData.accuracy
           }, new Date());
           apiCallCount++;
-          setNextApiUpdate(120); // カウントダウンをリセット
-          console.log(`[${username}] Next API update in 120 seconds`);
+          setNextApiUpdate(20); // カウントダウンを20秒にリセット
+          console.log(`[${username}] Next API update in 20 seconds`);
         }
       } catch (error) {
         console.error(`[${username}] Failed to fetch latest data:`, error);
@@ -124,14 +124,14 @@ export default function UserCard({
     const countdownInterval = setInterval(() => {
       setNextApiUpdate(prev => {
         if (prev <= 0) {
-          return 120; // 0になったら120にリセット（次のAPI呼び出しに備える）
+          return 20; // 0になったら20にリセット（次のAPI呼び出しに備える）
         }
         return prev - 1;
       });
     }, 1000);
 
-    // 2分ごとに実際のデータを取得して補正
-    const apiInterval = setInterval(fetchLatestData, 2 * 60 * 1000);
+    // 20秒ごとに実際のデータを取得して補正
+    const apiInterval = setInterval(fetchLatestData, 20 * 1000);
     
     // 初回実行（即座に）
     fetchLatestData();
