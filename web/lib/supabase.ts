@@ -160,45 +160,64 @@ export interface GrowthRate {
 
 // 増加率を取得
 export async function getGrowthRate(osuUserId: number, mode: string): Promise<GrowthRate | null> {
-  console.log(`Fetching growth rate for user ${osuUserId} in ${mode} mode`);
-  const { data, error } = await supabase
-    .from('osu_growth_rates')
-    .select('*')
-    .eq('osu_user_id', osuUserId)
-    .eq('mode', mode)
-    .single();
+  console.log(`[Supabase] Fetching growth rate for user ${osuUserId} in ${mode} mode`);
+  
+  try {
+    const { data, error } = await supabase
+      .from('osu_growth_rates')
+      .select('*')
+      .eq('osu_user_id', osuUserId)
+      .eq('mode', mode)
+      .single();
 
-  if (error && error.code !== 'PGRST116') {
-    console.error('Failed to fetch growth rate:', error);
+    if (error) {
+      if (error.code === 'PGRST116') {
+        console.log(`[Supabase] No growth rate found for user ${osuUserId}`);
+        return null;
+      }
+      console.error('[Supabase] Failed to fetch growth rate:', error);
+      return null;
+    }
+
+    console.log(`[Supabase] Growth rate found:`, data ? 'Yes' : 'No');
+    return data;
+  } catch (error) {
+    console.error('[Supabase] Exception while fetching growth rate:', error);
     return null;
   }
-
-  return data;
 }
 
 // 増加率を保存/更新
 export async function saveGrowthRate(growthRate: Omit<GrowthRate, 'last_calculated_at' | 'updated_at'>): Promise<boolean> {
-  console.log(`Saving growth rate for user ${growthRate.osu_user_id} in ${growthRate.mode} mode`);
-  const { error } = await supabase
-    .from('osu_growth_rates')
-    .upsert({
-      osu_user_id: growthRate.osu_user_id,
-      mode: growthRate.mode,
-      pp_per_hour: growthRate.pp_per_hour,
-      rank_change_per_hour: growthRate.rank_change_per_hour,
-      score_per_hour: growthRate.score_per_hour,
-      plays_per_hour: growthRate.plays_per_hour,
-      confidence: growthRate.confidence,
-      data_points: growthRate.data_points,
-      last_calculated_at: new Date().toISOString()
-    }, {
-      onConflict: 'osu_user_id,mode'
-    });
+  console.log(`[Supabase] Saving growth rate for user ${growthRate.osu_user_id} in ${growthRate.mode} mode`);
+  
+  try {
+    const { error } = await supabase
+      .from('osu_growth_rates')
+      .upsert({
+        osu_user_id: growthRate.osu_user_id,
+        mode: growthRate.mode,
+        pp_per_hour: growthRate.pp_per_hour,
+        rank_change_per_hour: growthRate.rank_change_per_hour,
+        score_per_hour: growthRate.score_per_hour,
+        plays_per_hour: growthRate.plays_per_hour,
+        confidence: growthRate.confidence,
+        data_points: growthRate.data_points,
+        last_calculated_at: new Date().toISOString()
+      }, {
+        onConflict: 'osu_user_id,mode'
+      });
 
-  if (error) {
-    console.error('Failed to save growth rate:', error);
+    if (error) {
+      console.error('[Supabase] Failed to save growth rate:', error);
+      console.error('[Supabase] Error details:', JSON.stringify(error, null, 2));
+      return false;
+    }
+
+    console.log(`[Supabase] Growth rate saved successfully`);
+    return true;
+  } catch (error) {
+    console.error('[Supabase] Exception while saving growth rate:', error);
     return false;
   }
-
-  return true;
 }

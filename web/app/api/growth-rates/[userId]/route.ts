@@ -37,20 +37,32 @@ export async function GET(
     console.log(`[Growth Rate API] Request for user ${userId}, mode: ${mode}`);
 
     // 既存の増加率を取得
-    const existingRate = await getGrowthRate(userId, mode);
+    let existingRate = null;
+    try {
+      existingRate = await getGrowthRate(userId, mode);
+      console.log(`[Growth Rate API] Existing rate found:`, existingRate ? 'Yes' : 'No');
+    } catch (error) {
+      console.error(`[Growth Rate API] Failed to get existing rate:`, error);
+    }
     
     // 5分以内に計算されていれば、それを返す
-    if (existingRate) {
+    if (existingRate && existingRate.last_calculated_at) {
       const lastCalc = new Date(existingRate.last_calculated_at).getTime();
       const now = Date.now();
+      const ageSeconds = Math.round((now - lastCalc) / 1000);
+      console.log(`[Growth Rate API] Existing rate age: ${ageSeconds}s`);
+      
       if (now - lastCalc < 5 * 60 * 1000) {
-        console.log(`[Growth Rate API] Using cached rate (${Math.round((now - lastCalc) / 1000)}s old)`);
+        console.log(`[Growth Rate API] Using cached rate`);
         return NextResponse.json(existingRate);
       }
+      console.log(`[Growth Rate API] Cached rate too old, recalculating`);
     }
 
     // 履歴データから増加率を再計算
+    console.log(`[Growth Rate API] Fetching snapshots...`);
     const snapshots = await getUserSnapshots(userId, mode, 100);
+    console.log(`[Growth Rate API] Retrieved ${snapshots.length} snapshots`);
     
     if (snapshots.length < 2) {
       console.log(`[Growth Rate API] Not enough data (${snapshots.length} snapshots)`);
@@ -99,11 +111,16 @@ export async function GET(
     };
 
     // DBに保存
-    await saveGrowthRate(growthRate);
+    console.log(`[Growth Rate API] Saving to DB...`);
+    const saved = await saveGrowthRate(growthRate);
+    console.log(`[Growth Rate API] Save result:`, saved ? 'Success' : 'Failed');
 
     console.log(`[Growth Rate API] Calculated new rate - PP/h: ${ppTrend.toFixed(2)}, Score/h: ${scoreTrend.toFixed(0)}`);
 
-    return NextResponse.json(growthRate);
+    return NextResponse.json({
+      ...growthRate,
+      last_calculated_at: new Date().toISOString()
+    });
 
   } catch (error) {
     console.error('[Growth Rate API] Error:', error);
