@@ -246,6 +246,11 @@ export class RealtimeEstimator {
       }
     };
 
-    console.log('[Estimator] Trend set from DB:', this.estimation.trend);
+    console.log('[Estimator] Trend set from DB:', {
+      pp_per_hour: this.estimation.trend.pp_per_hour.toFixed(2),
+      score_per_hour: this.estimation.trend.score_per_hour.toFixed(0),
+      score_per_second: (this.estimation.trend.score_per_hour / 3600).toFixed(2),
+      confidence: confidence.toFixed(2)
+    });
   }
 }

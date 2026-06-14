@@ -81,12 +81,16 @@ export default function UserDetailPage() {
           
           // Estimatorに初期データを追加
           estimator.addSnapshot(user.latest_stats, new Date());
+          console.log(`[Detail Page] Added initial snapshot for ${user.osu_username}`);
         }
 
-        // 増加率をDBから取得
+        // 増加率をDBから取得してEstimatorに設定
+        console.log(`[Detail Page] Loading growth rate from DB...`);
         const growthResponse = await fetch(`/api/growth-rates/${userId}?mode=${mode}`);
         if (growthResponse.ok) {
           const growthRate = await growthResponse.json();
+          console.log(`[Detail Page] Growth rate loaded:`, growthRate);
+          
           if (growthRate.data_points >= 2) {
             estimator.setTrendFromDB({
               pp_per_hour: growthRate.pp_per_hour,
@@ -94,7 +98,12 @@ export default function UserDetailPage() {
               plays_per_hour: growthRate.plays_per_hour,
               score_per_hour: growthRate.score_per_hour
             }, growthRate.confidence);
+            console.log(`[Detail Page] Trend applied - Score/h: ${growthRate.score_per_hour.toFixed(0)}`);
+          } else {
+            console.warn(`[Detail Page] Not enough data points: ${growthRate.data_points}`);
           }
+        } else {
+          console.warn(`[Detail Page] Failed to load growth rate`);
         }
 
         // 履歴データを取得
@@ -103,11 +112,12 @@ export default function UserDetailPage() {
           const historyData = await historyResponse.json();
           setHistory(historyData);
           setRealtimeHistory(historyData.slice(-60)); // 最新60件
+          console.log(`[Detail Page] Loaded ${historyData.length} historical snapshots`);
         }
 
         setLoading(false);
       } catch (error) {
-        console.error('Failed to fetch user data:', error);
+        console.error('[Detail Page] Failed to fetch user data:', error);
         setLoading(false);
       }
     };
@@ -119,11 +129,14 @@ export default function UserDetailPage() {
   useEffect(() => {
     if (!currentStats) return;
 
-    const interval = setInterval(async () => {
+    const fetchAndCorrect = async () => {
       try {
+        console.log(`[Detail Page] Fetching API correction...`);
         const response = await fetch(`/api/users/${userId}/stats?mode=${mode}`);
         if (response.ok) {
           const stats = await response.json();
+          console.log(`[Detail Page] API correction - Score: ${stats.total_score.toLocaleString()}, PP: ${stats.pp.toFixed(2)}`);
+          
           estimator.correctWithRealData({
             pp: stats.pp,
             global_rank: stats.global_rank,
@@ -132,33 +145,26 @@ export default function UserDetailPage() {
             total_score: stats.total_score,
             accuracy: stats.accuracy
           }, new Date());
+          
+          console.log(`[Detail Page] Correction applied, next in 20 seconds`);
         }
       } catch (error) {
-        console.error('Failed to fetch latest stats:', error);
+        console.error('[Detail Page] Failed to fetch latest stats:', error);
       }
-    }, 20000);
+    };
 
-    // 初回実行
-    (async () => {
-      try {
-        const response = await fetch(`/api/users/${userId}/stats?mode=${mode}`);
-        if (response.ok) {
-          const stats = await response.json();
-          estimator.correctWithRealData({
-            pp: stats.pp,
-            global_rank: stats.global_rank,
-            country_rank: stats.country_rank,
-            play_count: stats.play_count,
-            total_score: stats.total_score,
-            accuracy: stats.accuracy
-          }, new Date());
-        }
-      } catch (error) {
-        console.error('Failed to fetch initial stats:', error);
-      }
-    })();
+    // 初回実行（5秒後に開始して初期化完了を待つ）
+    const initialTimeout = setTimeout(() => {
+      fetchAndCorrect();
+    }, 5000);
 
-    return () => clearInterval(interval);
+    // 20秒ごとに実行
+    const interval = setInterval(fetchAndCorrect, 20000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
   }, [userId, mode, estimator, currentStats]);
 
   if (loading) {
