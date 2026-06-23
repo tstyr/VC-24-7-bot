@@ -67,8 +67,9 @@ export async function uploadToR2(filePath, fileName, contentType) {
 
     await upload.done();
 
-    // 公開URLを生成
-    const publicUrl = `${PUBLIC_URL_BASE}/${uniqueFileName}`;
+    // 公開URLを生成（ファイル名をURLエンコード）
+    const encodedFileName = encodeURIComponent(uniqueFileName);
+    const publicUrl = `${PUBLIC_URL_BASE}/${encodedFileName}`;
 
     log(`Upload completed: ${publicUrl}`, 'success');
 
