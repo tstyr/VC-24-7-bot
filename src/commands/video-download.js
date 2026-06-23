@@ -6,11 +6,11 @@ import { log } from '../utils/logger.js';
 import { unlink } from 'fs/promises';
 
 export const data = new SlashCommandBuilder()
-  .setName('youtube-download')
-  .setDescription('YouTube動画をダウンロードします')
+  .setName('video-download')
+  .setDescription('動画をダウンロードします（YouTube, Twitter, TikTok, Instagram等1000以上のサイト対応）')
   .addStringOption(option =>
     option.setName('url')
-      .setDescription('YouTube動画のURL')
+      .setDescription('動画のURL（YouTube, Twitter, TikTok, Instagram, Twitch等）')
       .setRequired(true)
   );
 
@@ -27,13 +27,6 @@ export async function execute(interaction) {
 
     const url = interaction.options.getString('url');
 
-    // URLの検証
-    if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
-      return await interaction.editReply({
-        content: '❌ 有効なYouTube URLを入力してください。'
-      });
-    }
-
     // ユーザーの設定を取得
     const settings = await getDownloadSettings(interaction.user.id);
     
@@ -41,7 +34,7 @@ export async function execute(interaction) {
 
     // 動画情報を取得
     await interaction.editReply({
-      content: '📊 動画情報を取得しています...'
+      content: '📊 動画情報を取得しています...\n\n対応サイト: YouTube, Twitter(X), TikTok, Instagram, Twitch, Vimeo, Dailymotion, ニコニコ動画など1000以上'
     });
 
     let videoInfo;
@@ -50,7 +43,7 @@ export async function execute(interaction) {
     } catch (error) {
       log(`Failed to get video info: ${error.message}`, 'error');
       return await interaction.editReply({
-        content: '❌ 動画情報の取得に失敗しました。URLを確認してください。'
+        content: `❌ 動画情報の取得に失敗しました。\n\n**考えられる原因:**\n• URLが無効\n• サイトがBot検出を強化している\n• 動画が削除されている\n• 地域制限がある\n\n**対処方法:**\n• 別の動画で試す\n• 数分待って再試行\n• 他のプラットフォーム（Twitter, TikTok等）で試す\n\nエラー: ${error.message.split('\n')[0]}`
       });
     }
 
@@ -65,7 +58,7 @@ export async function execute(interaction) {
     } catch (error) {
       log(`Download failed: ${error.message}`, 'error');
       return await interaction.editReply({
-        content: `❌ ダウンロードに失敗しました。\nエラー: ${error.message}`
+        content: `❌ ダウンロードに失敗しました。\nエラー: ${error.message.split('\n')[0]}`
       });
     }
 
@@ -122,7 +115,7 @@ export async function execute(interaction) {
     log(`Public URL: ${uploadResult.url}`, 'info');
 
   } catch (error) {
-    log(`YouTube download command error: ${error.message}`, 'error');
+    log(`Video download command error: ${error.message}`, 'error');
     log(error.stack, 'error');
 
     await interaction.editReply({
