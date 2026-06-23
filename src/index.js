@@ -47,6 +47,7 @@ import * as timezoneCommand from './commands/timezone.js';
 import * as youtubeConfigCommand from './commands/youtube-config.js';
 import * as youtubeDownloadCommand from './commands/youtube-download.js';
 import { initDownloadDir, cleanupOldFiles } from './services/youtubeDownloader.js';
+import { checkR2Config } from './services/r2Storage.js';
 
 config();
 
@@ -156,6 +157,9 @@ setInterval(() => {
 
 // YouTube ダウンロードディレクトリの初期化
 initDownloadDir().catch(err => log(`Failed to init download dir: ${err.message}`, 'error'));
+
+// R2設定の確認
+checkR2Config();
 
 // 古いダウンロードファイルのクリーンアップ（1時間ごと）
 setInterval(() => {

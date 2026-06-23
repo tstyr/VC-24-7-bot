@@ -98,6 +98,13 @@ LAVALINK_SECURE=true
 
 KOYEB_PUBLIC_DOMAIN=your-app.koyeb.app
 PORT=8000
+
+# Cloudflare R2設定（YouTube動画ダウンロード用）
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=your_r2_access_key_id
+R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
+R2_BUCKET_NAME=youtube-downloads
+R2_PUBLIC_URL=https://your-custom-domain.com
 ```
 
 ### 3. Botの起動（ローカル）

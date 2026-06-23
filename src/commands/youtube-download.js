@@ -1,10 +1,9 @@
-import { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { getDownloadSettings } from '../database/youtubeDownloadSettings.js';
 import { downloadVideo, getVideoInfo, formatFileSize } from '../services/youtubeDownloader.js';
+import { uploadToR2, checkR2Config } from '../services/r2Storage.js';
 import { log } from '../utils/logger.js';
-
-// Discord の最大ファイルサイズ（25MB for non-boosted, 50MB for boosted level 2, 100MB for level 3）
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB (デフォルト)
+import { unlink } from 'fs/promises';
 
 export const data = new SlashCommandBuilder()
   .setName('youtube-download')
@@ -19,6 +18,13 @@ export async function execute(interaction) {
   await interaction.deferReply();
 
   try {
+    // R2設定を確認
+    if (!checkR2Config()) {
+      return await interaction.editReply({
+        content: '❌ Cloudflare R2の設定が完了していません。管理者に連絡してください。'
+      });
+    }
+
     const url = interaction.options.getString('url');
 
     // URLの検証
@@ -50,7 +56,7 @@ export async function execute(interaction) {
 
     // ダウンロード開始
     await interaction.editReply({
-      content: `⬇️ ダウンロード中...\n**${videoInfo.title}**\n形式: ${settings.format.toUpperCase()}`
+      content: `⬇️ ダウンロード中...\n**${videoInfo.title}**\n形式: ${settings.format.toUpperCase()}\n\nこの処理には時間がかかる場合があります...`
     });
 
     let downloadResult;
@@ -63,66 +69,57 @@ export async function execute(interaction) {
       });
     }
 
-    // ファイルサイズチェック
-    if (downloadResult.fileSize > MAX_FILE_SIZE) {
-      const embed = new EmbedBuilder()
-        .setColor('#FFA500')
-        .setTitle('⚠️ ファイルサイズ制限')
-        .setDescription('ファイルサイズがDiscordの制限（25MB）を超えています。')
-        .addFields(
-          { name: '動画タイトル', value: videoInfo.title, inline: false },
-          { name: 'ファイルサイズ', value: formatFileSize(downloadResult.fileSize), inline: true },
-          { name: '形式', value: settings.format.toUpperCase(), inline: true }
-        )
-        .setFooter({ text: 'より低い品質を設定するか、外部サービスをご利用ください。' })
-        .setTimestamp();
+    // R2にアップロード
+    await interaction.editReply({
+      content: `☁️ Cloudflare R2にアップロード中...\n**${videoInfo.title}**\nファイルサイズ: ${formatFileSize(downloadResult.fileSize)}\n\nこの処理には時間がかかる場合があります...`
+    });
 
-      // ファイルを削除
-      await import('fs').then(fs => fs.promises.unlink(downloadResult.filePath));
-
+    let uploadResult;
+    try {
+      const contentType = settings.format === 'mp4' ? 'video/mp4' : 'audio/mp4';
+      uploadResult = await uploadToR2(downloadResult.filePath, downloadResult.fileName, contentType);
+    } catch (error) {
+      log(`R2 upload failed: ${error.message}`, 'error');
+      
+      // ローカルファイルを削除
+      await unlink(downloadResult.filePath).catch(() => {});
+      
       return await interaction.editReply({
-        content: null,
-        embeds: [embed]
+        content: `❌ アップロードに失敗しました。\nエラー: ${error.message}`
       });
     }
 
-    // ファイルを送信
-    await interaction.editReply({
-      content: '📤 アップロード中...'
-    });
+    // ローカルファイルを削除（アップロード完了後）
+    try {
+      await unlink(downloadResult.filePath);
+      log(`Cleaned up local file: ${downloadResult.fileName}`, 'info');
+    } catch (error) {
+      log(`Failed to clean up local file: ${error.message}`, 'error');
+    }
 
-    const attachment = new AttachmentBuilder(downloadResult.filePath);
-
+    // 成功メッセージとダイレクトリンクを送信
     const embed = new EmbedBuilder()
       .setColor('#00FF00')
       .setTitle('✅ ダウンロード完了')
       .setDescription(`**${videoInfo.title}**`)
       .addFields(
         { name: 'アップロード者', value: videoInfo.uploader || 'Unknown', inline: true },
-        { name: 'ファイルサイズ', value: formatFileSize(downloadResult.fileSize), inline: true },
-        { name: '形式', value: settings.format.toUpperCase(), inline: true }
+        { name: 'ファイルサイズ', value: formatFileSize(uploadResult.size), inline: true },
+        { name: '形式', value: settings.format.toUpperCase(), inline: true },
+        { name: '有効期限', value: '3日間', inline: true }
       )
       .setThumbnail(videoInfo.thumbnail || null)
-      .setFooter({ text: `リクエスト: ${interaction.user.tag}` })
+      .setFooter({ text: `リクエスト: ${interaction.user.tag} | Cloudflare R2経由` })
       .setTimestamp();
 
+    // ダイレクトリンクをメッセージとして送信（Discordのインライン再生用）
     await interaction.editReply({
-      content: null,
-      embeds: [embed],
-      files: [attachment]
+      content: `🎬 **ダウンロード完了！**\n\n${uploadResult.url}\n\n*このリンクは3日間有効です*`,
+      embeds: [embed]
     });
 
-    log(`Download completed: ${videoInfo.title} (${formatFileSize(downloadResult.fileSize)})`, 'info');
-
-    // ファイルを削除（送信後）
-    setTimeout(async () => {
-      try {
-        await import('fs').then(fs => fs.promises.unlink(downloadResult.filePath));
-        log(`Cleaned up file: ${downloadResult.fileName}`, 'info');
-      } catch (error) {
-        log(`Failed to clean up file: ${error.message}`, 'error');
-      }
-    }, 5000); // 5秒後に削除
+    log(`Download completed and uploaded to R2: ${videoInfo.title} (${formatFileSize(uploadResult.size)})`, 'success');
+    log(`Public URL: ${uploadResult.url}`, 'info');
 
   } catch (error) {
     log(`YouTube download command error: ${error.message}`, 'error');
@@ -133,3 +130,4 @@ export async function execute(interaction) {
     }).catch(() => {});
   }
 }
+
