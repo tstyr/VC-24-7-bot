@@ -76,15 +76,29 @@ function getExtraOptions(siteType) {
   switch (siteType) {
     case 'youtube':
       // YouTubeのBot検出回避策
+      if (process.env.YOUTUBE_COOKIES_PATH) {
+        // Cookie認証を使用（最も安定）
+        options.push(
+          '--cookies', process.env.YOUTUBE_COOKIES_PATH,
+          '--extractor-args', 'youtube:player_client=android,ios,web'
+        );
+      } else if (process.env.YOUTUBE_VISITOR_DATA) {
+        // Visitor Data認証を使用（Cookieなし）
+        options.push(
+          '--extractor-args', `youtubetab:skip=webpage`,
+          '--extractor-args', `youtube:player_skip=webpage,configs;visitor_data=${process.env.YOUTUBE_VISITOR_DATA}`
+        );
+      } else {
+        // デフォルト: player_skipのみ（不安定だが試す価値あり）
+        options.push(
+          '--extractor-args', 'youtube:player_client=android,ios,web;player_skip=webpage,configs'
+        );
+      }
+      
+      // 共通オプション
       options.push(
-        '--extractor-args', 'youtube:player_client=android,ios,web;player_skip=webpage,configs',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       );
-      
-      // Cookieファイルが存在する場合のみ使用
-      if (process.env.YOUTUBE_COOKIES_PATH) {
-        options.push('--cookies', process.env.YOUTUBE_COOKIES_PATH);
-      }
       break;
     
     case 'tiktok':
