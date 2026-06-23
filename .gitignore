@@ -6,6 +6,11 @@ dist/
 .env.local
 downloads/
 
+# YouTube Cookies (sensitive)
+cookies.txt
+*.cookies.txt
+youtube.com_cookies.txt
+
 # Web dashboard specific
 web/.next/
 web/out/
