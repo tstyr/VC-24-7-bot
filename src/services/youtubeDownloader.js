@@ -44,7 +44,16 @@ async function checkYtDlpInstalled() {
  */
 export async function getVideoInfo(url) {
   try {
-    const { stdout } = await execPromise(`yt-dlp --dump-json --no-playlist "${url}"`);
+    const command = [
+      'yt-dlp',
+      '--dump-json',
+      '--no-playlist',
+      '--user-agent', '"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"',
+      '--extractor-args', 'youtube:player_client=android',
+      `"${url}"`
+    ].join(' ');
+
+    const { stdout } = await execPromise(command);
     const info = JSON.parse(stdout);
     
     return {
@@ -107,6 +116,8 @@ export async function downloadVideo(url, format = 'mp4', quality = 'best') {
       '-o', outputTemplate,
       '--no-playlist',
       '--newline',
+      '--user-agent', '"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"',
+      '--extractor-args', 'youtube:player_client=android',
       `"${url}"`
     ].join(' ');
 

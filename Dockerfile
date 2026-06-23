@@ -2,7 +2,8 @@ FROM node:20-alpine
 
 # Install FFmpeg, python3, and yt-dlp
 # Use --break-system-packages flag for pip3 install on Alpine 3.21+
-RUN apk add --no-cache ffmpeg python3 py3-pip && \
+# Also install nodejs for yt-dlp JavaScript runtime support
+RUN apk add --no-cache ffmpeg python3 py3-pip nodejs npm && \
     pip3 install --break-system-packages --no-cache-dir yt-dlp
 
 WORKDIR /app
