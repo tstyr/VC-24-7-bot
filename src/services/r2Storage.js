@@ -48,6 +48,7 @@ export async function uploadToR2(filePath, fileName, contentType) {
         Key: uniqueFileName,
         Body: fileStream,
         ContentType: contentType,
+        ACL: 'public-read', // 公開アクセス可能にする
         // 3日後に自動削除
         Metadata: {
           'uploaded-at': new Date().toISOString(),
