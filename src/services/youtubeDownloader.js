@@ -13,6 +13,12 @@ const __dirname = path.dirname(__filename);
 // ダウンロードディレクトリ
 const DOWNLOAD_DIR = path.join(__dirname, '../../downloads');
 
+// exec用のデフォルトオプション
+const execOptions = {
+  maxBuffer: 50 * 1024 * 1024, // 50MB
+  timeout: 300000 // 5分
+};
+
 /**
  * ダウンロードディレクトリを初期化
  */
@@ -105,11 +111,15 @@ export async function getVideoInfo(url) {
       'yt-dlp',
       '--dump-json',
       '--no-playlist',
+      '--no-check-certificate',
+      '--ignore-errors',
+      '--geo-bypass',
+      '--socket-timeout', '30',
       ...extraOptions,
       `"${url}"`
     ].join(' ');
 
-    const { stdout } = await execPromise(command);
+    const { stdout } = await execPromise(command, execOptions);
     const info = JSON.parse(stdout);
     
     return {
@@ -175,11 +185,17 @@ export async function downloadVideo(url, format = 'mp4', quality = 'best') {
       '-o', outputTemplate,
       '--no-playlist',
       '--newline',
+      '--no-check-certificate',
+      '--ignore-errors',
+      '--geo-bypass',
+      '--socket-timeout', '30',
+      '--retries', '3',
+      '--fragment-retries', '3',
       ...extraOptions,
       `"${url}"`
     ].join(' ');
 
-    await execPromise(command);
+    await execPromise(command, execOptions);
 
     log(`Download completed`, 'info');
 
