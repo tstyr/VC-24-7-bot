@@ -40,16 +40,72 @@ async function checkYtDlpInstalled() {
 }
 
 /**
+ * URLからサイトタイプを判定
+ */
+function getSiteType(url) {
+  const lowerUrl = url.toLowerCase();
+  
+  if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) {
+    return 'youtube';
+  }
+  if (lowerUrl.includes('tiktok.com')) {
+    return 'tiktok';
+  }
+  if (lowerUrl.includes('twitter.com') || lowerUrl.includes('x.com')) {
+    return 'twitter';
+  }
+  if (lowerUrl.includes('instagram.com')) {
+    return 'instagram';
+  }
+  
+  return 'other';
+}
+
+/**
+ * サイトタイプに応じた追加オプションを取得
+ */
+function getExtraOptions(siteType) {
+  const options = [];
+  
+  switch (siteType) {
+    case 'youtube':
+      // YouTubeのみplayer_client指定
+      options.push('--extractor-args', 'youtube:player_client=android,web');
+      break;
+    
+    case 'tiktok':
+      // TikTokは特別なオプション不要
+      break;
+    
+    case 'twitter':
+      // Twitterは特別なオプション不要
+      break;
+    
+    case 'instagram':
+      // Instagramは特別なオプション不要
+      break;
+    
+    default:
+      // その他のサイトもオプション不要
+      break;
+  }
+  
+  return options;
+}
+
+/**
  * YouTube動画情報を取得
  */
 export async function getVideoInfo(url) {
   try {
+    const siteType = getSiteType(url);
+    const extraOptions = getExtraOptions(siteType);
+    
     const command = [
       'yt-dlp',
       '--dump-json',
       '--no-playlist',
-      '--extractor-args', 'youtube:player_client=android,web',
-      '--no-check-certificates',
+      ...extraOptions,
       `"${url}"`
     ].join(' ');
 
@@ -60,7 +116,7 @@ export async function getVideoInfo(url) {
       title: info.title,
       duration: info.duration,
       thumbnail: info.thumbnail,
-      uploader: info.uploader,
+      uploader: info.uploader || info.uploader_id || 'Unknown',
       formats: info.formats
     };
   } catch (error) {
@@ -94,6 +150,9 @@ export async function downloadVideo(url, format = 'mp4', quality = 'best') {
 
     log(`Starting download: ${url} (format: ${format}, quality: ${quality})`, 'info');
 
+    const siteType = getSiteType(url);
+    const extraOptions = getExtraOptions(siteType);
+
     let formatOption;
     if (format === 'm4a') {
       // 音声のみ
@@ -116,8 +175,7 @@ export async function downloadVideo(url, format = 'mp4', quality = 'best') {
       '-o', outputTemplate,
       '--no-playlist',
       '--newline',
-      '--extractor-args', 'youtube:player_client=android,web',
-      '--no-check-certificates',
+      ...extraOptions,
       `"${url}"`
     ].join(' ');
 
