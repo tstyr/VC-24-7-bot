@@ -75,8 +75,17 @@ function getExtraOptions(siteType) {
   
   switch (siteType) {
     case 'youtube':
-      // YouTubeのみplayer_client指定
-      options.push('--extractor-args', 'youtube:player_client=android,web');
+      // YouTubeのBot検出回避策
+      options.push(
+        '--extractor-args', 'youtube:player_client=android,ios,web',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        // ブラウザからCookieを取得（オプション：Chrome, Firefox, Edge等から自動取得）
+        '--cookies-from-browser', 'chrome',
+        // OAuth認証を試行
+        '--mark-watched',
+        // IPv6を無効化（一部環境で有効）
+        '--force-ipv4'
+      );
       break;
     
     case 'tiktok':
@@ -120,7 +129,9 @@ export async function getVideoInfo(url) {
 
     // spawnを使って配列で引数を渡す（シェルを経由しない）
     const { stdout } = await new Promise((resolve, reject) => {
-      const child = spawn('yt-dlp', args);
+      const child = spawn('yt-dlp', args, {
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
       let stdout = '';
       let stderr = '';
 
@@ -134,7 +145,40 @@ export async function getVideoInfo(url) {
 
       child.on('close', (code) => {
         if (code !== 0) {
-          reject(new Error(stderr || `Process exited with code ${code}`));
+          // Cookie取得失敗時は、Cookieなしで再試行
+          if (stderr.includes('cookies') || stderr.includes('Sign in to confirm')) {
+            log('Cookie authentication failed, retrying without cookies...', 'warn');
+            const fallbackArgs = args.filter(arg => 
+              arg !== '--cookies-from-browser' && 
+              !args[args.indexOf(arg) - 1]?.includes('cookies-from-browser')
+            );
+            
+            const retryChild = spawn('yt-dlp', fallbackArgs);
+            let retryStdout = '';
+            let retryStderr = '';
+
+            retryChild.stdout.on('data', (data) => {
+              retryStdout += data.toString();
+            });
+
+            retryChild.stderr.on('data', (data) => {
+              retryStderr += data.toString();
+            });
+
+            retryChild.on('close', (retryCode) => {
+              if (retryCode !== 0) {
+                reject(new Error(retryStderr || `Process exited with code ${retryCode}`));
+              } else {
+                resolve({ stdout: retryStdout, stderr: retryStderr });
+              }
+            });
+
+            retryChild.on('error', (error) => {
+              reject(error);
+            });
+          } else {
+            reject(new Error(stderr || `Process exited with code ${code}`));
+          }
         } else {
           resolve({ stdout, stderr });
         }
@@ -220,7 +264,9 @@ export async function downloadVideo(url, format = 'mp4', quality = 'best') {
     ];
 
     await new Promise((resolve, reject) => {
-      const child = spawn('yt-dlp', args);
+      const child = spawn('yt-dlp', args, {
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
       let stdout = '';
       let stderr = '';
 
@@ -234,7 +280,40 @@ export async function downloadVideo(url, format = 'mp4', quality = 'best') {
 
       child.on('close', (code) => {
         if (code !== 0) {
-          reject(new Error(stderr || `Process exited with code ${code}`));
+          // Cookie取得失敗時は、Cookieなしで再試行
+          if (siteType === 'youtube' && (stderr.includes('cookies') || stderr.includes('Sign in to confirm'))) {
+            log('Cookie authentication failed, retrying without cookies...', 'warn');
+            const fallbackArgs = args.filter(arg => 
+              arg !== '--cookies-from-browser' && 
+              !args[args.indexOf(arg) - 1]?.includes('cookies-from-browser')
+            );
+            
+            const retryChild = spawn('yt-dlp', fallbackArgs);
+            let retryStdout = '';
+            let retryStderr = '';
+
+            retryChild.stdout.on('data', (data) => {
+              retryStdout += data.toString();
+            });
+
+            retryChild.stderr.on('data', (data) => {
+              retryStderr += data.toString();
+            });
+
+            retryChild.on('close', (retryCode) => {
+              if (retryCode !== 0) {
+                reject(new Error(retryStderr || `Process exited with code ${retryCode}`));
+              } else {
+                resolve({ stdout: retryStdout, stderr: retryStderr });
+              }
+            });
+
+            retryChild.on('error', (error) => {
+              reject(error);
+            });
+          } else {
+            reject(new Error(stderr || `Process exited with code ${code}`));
+          }
         } else {
           resolve({ stdout, stderr });
         }
