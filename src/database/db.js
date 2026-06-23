@@ -265,6 +265,22 @@ export async function testConnection() {
       CREATE INDEX IF NOT EXISTS idx_osu_top_play_snapshots_lookup
       ON osu_top_play_snapshots (osu_user_id, mode, captured_at DESC)
     `);
+
+    // YouTube ダウンロード設定テーブル
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS youtube_download_settings (
+        user_id VARCHAR(255) PRIMARY KEY,
+        format VARCHAR(10) NOT NULL DEFAULT 'mp4',
+        quality VARCHAR(20) DEFAULT 'best',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_youtube_download_settings_user_id 
+      ON youtube_download_settings(user_id)
+    `);
     
     client.release();
     log('PostgreSQL接続成功', 'success');
