@@ -44,6 +44,9 @@ import * as cloneCategoryCommand from './commands/clone-category.js';
 import * as pingCommand from './commands/ping.js';
 import * as rolePanelCommand from './commands/role-panel.js';
 import * as timezoneCommand from './commands/timezone.js';
+import * as youtubeConfigCommand from './commands/youtube-config.js';
+import * as youtubeDownloadCommand from './commands/youtube-download.js';
+import { initDownloadDir, cleanupOldFiles } from './services/youtubeDownloader.js';
 
 config();
 
@@ -93,6 +96,8 @@ client.commands.set(cloneCategoryCommand.data.name, cloneCategoryCommand);
 client.commands.set(pingCommand.data.name, pingCommand);
 client.commands.set(rolePanelCommand.data.name, rolePanelCommand);
 client.commands.set(timezoneCommand.data.name, timezoneCommand);
+client.commands.set(youtubeConfigCommand.data.name, youtubeConfigCommand);
+client.commands.set(youtubeDownloadCommand.data.name, youtubeDownloadCommand);
 
 // 音楽プレイヤー初期化
 client.musicPlayer = new MusicPlayer(client);
@@ -148,6 +153,14 @@ if (process.env.KOYEB_PUBLIC_DOMAIN) {
 setInterval(() => {
   log('Instance is healthy. All health checks are passing.', 'success');
 }, 10 * 60 * 1000);
+
+// YouTube ダウンロードディレクトリの初期化
+initDownloadDir().catch(err => log(`Failed to init download dir: ${err.message}`, 'error'));
+
+// 古いダウンロードファイルのクリーンアップ（1時間ごと）
+setInterval(() => {
+  cleanupOldFiles().catch(err => log(`Cleanup error: ${err.message}`, 'error'));
+}, 60 * 60 * 1000);
 
 // 起動
 async function start() {

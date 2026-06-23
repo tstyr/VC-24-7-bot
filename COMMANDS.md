@@ -37,6 +37,9 @@
 - /volume level - 音量設定
 - /timezone base:<国/タイムゾーン> target:<国/タイムゾーン> - 時差表示
 
+- /youtube-config format:<mp4|m4a> [quality] - YouTubeダウンロード設定
+- /youtube-download url:<YouTube URL> - YouTube動画/音声をダウンロード
+
 - /clone-category source:<カテゴリ> name:<新カテゴリ名> - カテゴリ複製（管理者）
 
 
@@ -76,5 +79,8 @@
 - /play query/URL - Play music
 - /volume level - Set volume
 - /timezone base:<country/timezone> target:<country/timezone> - Show time difference
+
+- /youtube-config format:<mp4|m4a> [quality] - Configure YouTube download settings
+- /youtube-download url:<YouTube URL> - Download YouTube video/audio
 
 - /clone-category source:<category> name:<new name> - Clone category (admin)
