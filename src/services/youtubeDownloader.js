@@ -107,8 +107,7 @@ export async function getVideoInfo(url) {
     const siteType = getSiteType(url);
     const extraOptions = getExtraOptions(siteType);
     
-    const command = [
-      'yt-dlp',
+    const args = [
       '--dump-json',
       '--no-playlist',
       '--no-check-certificate',
@@ -116,10 +115,36 @@ export async function getVideoInfo(url) {
       '--geo-bypass',
       '--socket-timeout', '30',
       ...extraOptions,
-      `"${url}"`
-    ].join(' ');
+      url
+    ];
 
-    const { stdout } = await execPromise(command, execOptions);
+    // spawnを使って配列で引数を渡す（シェルを経由しない）
+    const { stdout } = await new Promise((resolve, reject) => {
+      const child = spawn('yt-dlp', args);
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      child.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(stderr || `Process exited with code ${code}`));
+        } else {
+          resolve({ stdout, stderr });
+        }
+      });
+
+      child.on('error', (error) => {
+        reject(error);
+      });
+    });
+
     const info = JSON.parse(stdout);
     
     return {
@@ -178,9 +203,8 @@ export async function downloadVideo(url, format = 'mp4', quality = 'best') {
       }
     }
 
-    // yt-dlp でダウンロード
-    const command = [
-      'yt-dlp',
+    // yt-dlp でダウンロード（spawnを使って配列で引数を渡す）
+    const args = [
       '-f', formatOption,
       '-o', outputTemplate,
       '--no-playlist',
@@ -192,10 +216,34 @@ export async function downloadVideo(url, format = 'mp4', quality = 'best') {
       '--retries', '3',
       '--fragment-retries', '3',
       ...extraOptions,
-      `"${url}"`
-    ].join(' ');
+      url
+    ];
 
-    await execPromise(command, execOptions);
+    await new Promise((resolve, reject) => {
+      const child = spawn('yt-dlp', args);
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      child.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(stderr || `Process exited with code ${code}`));
+        } else {
+          resolve({ stdout, stderr });
+        }
+      });
+
+      child.on('error', (error) => {
+        reject(error);
+      });
+    });
 
     log(`Download completed`, 'info');
 
