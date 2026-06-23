@@ -1,7 +1,8 @@
 FROM node:20-alpine
 
-# Install FFmpeg and python3 (for yt-dlp/play-dl if needed)
-RUN apk add --no-cache ffmpeg python3
+# Install FFmpeg, python3, and yt-dlp
+RUN apk add --no-cache ffmpeg python3 py3-pip && \
+    pip3 install --no-cache-dir yt-dlp
 
 WORKDIR /app
 

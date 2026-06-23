@@ -1,17 +1,17 @@
-import YTDlpWrap from 'yt-dlp-wrap';
+import { exec, spawn } from 'child_process';
+import { promisify } from 'util';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { log } from '../utils/logger.js';
+
+const execPromise = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ダウンロードディレクトリ
 const DOWNLOAD_DIR = path.join(__dirname, '../../downloads');
-
-// yt-dlp インスタンス
-const ytDlp = new YTDlpWrap();
 
 /**
  * ダウンロードディレクトリを初期化
@@ -27,11 +27,26 @@ export async function initDownloadDir() {
 }
 
 /**
+ * yt-dlpがインストールされているか確認
+ */
+async function checkYtDlpInstalled() {
+  try {
+    await execPromise('yt-dlp --version');
+    return true;
+  } catch (error) {
+    log('yt-dlp is not installed. Please install it: https://github.com/yt-dlp/yt-dlp#installation', 'error');
+    return false;
+  }
+}
+
+/**
  * YouTube動画情報を取得
  */
 export async function getVideoInfo(url) {
   try {
-    const info = await ytDlp.getVideoInfo(url);
+    const { stdout } = await execPromise(`yt-dlp --dump-json --no-playlist "${url}"`);
+    const info = JSON.parse(stdout);
+    
     return {
       title: info.title,
       duration: info.duration,
@@ -54,6 +69,12 @@ export async function getVideoInfo(url) {
  */
 export async function downloadVideo(url, format = 'mp4', quality = 'best') {
   try {
+    // yt-dlpがインストールされているか確認
+    const isInstalled = await checkYtDlpInstalled();
+    if (!isInstalled) {
+      throw new Error('yt-dlp is not installed on the system');
+    }
+
     // ダウンロードディレクトリが存在しない場合は作成
     await initDownloadDir();
 
@@ -74,22 +95,24 @@ export async function downloadVideo(url, format = 'mp4', quality = 'best') {
         formatOption = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
       } else {
         // 特定の解像度
-        formatOption = `bestvideo[height<=${quality.replace('p', '')}][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best`;
+        const heightValue = quality.replace('p', '');
+        formatOption = `bestvideo[height<=${heightValue}][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best`;
       }
     }
 
     // yt-dlp でダウンロード
-    const result = await ytDlp.execPromise([
-      url,
+    const command = [
+      'yt-dlp',
       '-f', formatOption,
       '-o', outputTemplate,
       '--no-playlist',
-      '--no-warnings',
       '--newline',
-      '--progress'
-    ]);
+      `"${url}"`
+    ].join(' ');
 
-    log(`Download completed: ${result}`, 'info');
+    await execPromise(command);
+
+    log(`Download completed`, 'info');
 
     // ダウンロードされたファイルを検索
     const files = await fs.readdir(DOWNLOAD_DIR);
