@@ -1,4 +1,5 @@
 import { pool } from './db.js';
+import { TtlCache } from '../utils/ttlCache.js';
 
 const DEFAULTS = {
   alert_channel_id: null,
@@ -16,6 +17,7 @@ const DEFAULTS = {
   report_metric: 'pp',
   report_top: 10
 };
+const guildSettingsCache = new TtlCache({ ttlMs: 30_000, maxEntries: 1_000 });
 
 function toNumber(value, fallback) {
   const numeric = Number(value);
@@ -28,56 +30,58 @@ export async function getGuildOsuSettings(guildId) {
     throw new Error('guildId is required');
   }
 
-  const result = await pool.query(
-    `SELECT
-      guild_id,
-      alert_channel_id,
-      report_channel_id,
-      realtime_score_channel_id,
-      daily_history_channel_id,
-      recruit_channel_id,
-      important_update_role_id,
-      alert_pp_threshold,
-      alert_rank_threshold,
-      snapshot_interval_minutes,
-      report_weekday,
-      report_hour_utc,
-      report_period,
-      report_metric,
-      report_top,
-      updated_at
-    FROM osu_guild_settings
-    WHERE guild_id = $1`,
-    [id]
-  );
+  return guildSettingsCache.getOrLoad(id, async () => {
+    const result = await pool.query(
+      `SELECT
+        guild_id,
+        alert_channel_id,
+        report_channel_id,
+        realtime_score_channel_id,
+        daily_history_channel_id,
+        recruit_channel_id,
+        important_update_role_id,
+        alert_pp_threshold,
+        alert_rank_threshold,
+        snapshot_interval_minutes,
+        report_weekday,
+        report_hour_utc,
+        report_period,
+        report_metric,
+        report_top,
+        updated_at
+      FROM osu_guild_settings
+      WHERE guild_id = $1`,
+      [id]
+    );
 
-  const row = result.rows[0] || null;
-  if (!row) {
-    return { guild_id: id, ...DEFAULTS };
-  }
+    const row = result.rows[0] || null;
+    if (!row) {
+      return { guild_id: id, ...DEFAULTS };
+    }
 
-  return {
-    guild_id: row.guild_id,
-    alert_channel_id: row.alert_channel_id,
-    report_channel_id: row.report_channel_id,
-    realtime_score_channel_id: row.realtime_score_channel_id,
-    daily_history_channel_id: row.daily_history_channel_id,
-    recruit_channel_id: row.recruit_channel_id,
-    important_update_role_id: row.important_update_role_id,
-    alert_pp_threshold: toNumber(row.alert_pp_threshold, DEFAULTS.alert_pp_threshold),
-    alert_rank_threshold: Math.trunc(
-      toNumber(row.alert_rank_threshold, DEFAULTS.alert_rank_threshold)
-    ),
-    snapshot_interval_minutes: Math.trunc(
-      toNumber(row.snapshot_interval_minutes, DEFAULTS.snapshot_interval_minutes)
-    ),
-    report_weekday: Math.trunc(toNumber(row.report_weekday, DEFAULTS.report_weekday)),
-    report_hour_utc: Math.trunc(toNumber(row.report_hour_utc, DEFAULTS.report_hour_utc)),
-    report_period: String(row.report_period || DEFAULTS.report_period),
-    report_metric: String(row.report_metric || DEFAULTS.report_metric),
-    report_top: Math.trunc(toNumber(row.report_top, DEFAULTS.report_top)),
-    updated_at: row.updated_at
-  };
+    return {
+      guild_id: row.guild_id,
+      alert_channel_id: row.alert_channel_id,
+      report_channel_id: row.report_channel_id,
+      realtime_score_channel_id: row.realtime_score_channel_id,
+      daily_history_channel_id: row.daily_history_channel_id,
+      recruit_channel_id: row.recruit_channel_id,
+      important_update_role_id: row.important_update_role_id,
+      alert_pp_threshold: toNumber(row.alert_pp_threshold, DEFAULTS.alert_pp_threshold),
+      alert_rank_threshold: Math.trunc(
+        toNumber(row.alert_rank_threshold, DEFAULTS.alert_rank_threshold)
+      ),
+      snapshot_interval_minutes: Math.trunc(
+        toNumber(row.snapshot_interval_minutes, DEFAULTS.snapshot_interval_minutes)
+      ),
+      report_weekday: Math.trunc(toNumber(row.report_weekday, DEFAULTS.report_weekday)),
+      report_hour_utc: Math.trunc(toNumber(row.report_hour_utc, DEFAULTS.report_hour_utc)),
+      report_period: String(row.report_period || DEFAULTS.report_period),
+      report_metric: String(row.report_metric || DEFAULTS.report_metric),
+      report_top: Math.trunc(toNumber(row.report_top, DEFAULTS.report_top)),
+      updated_at: row.updated_at
+    };
+  });
 }
 
 export async function upsertGuildOsuSettings(guildId, partialSettings) {
@@ -165,5 +169,6 @@ export async function upsertGuildOsuSettings(guildId, partialSettings) {
     ]
   );
 
+  guildSettingsCache.set(id, result.rows[0]);
   return result.rows[0];
 }

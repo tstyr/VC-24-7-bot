@@ -6,11 +6,12 @@ export const data = new SlashCommandBuilder()
   .setDescription('Check bot latency');
 
 export async function execute(interaction) {
-  const lang = await resolveUserLanguage(interaction.user.id);
+  await interaction.deferReply();
   const sentAt = Date.now();
   const wsPing = Math.round(interaction.client.ws.ping);
+  const lang = await resolveUserLanguage(interaction.user.id);
 
-  await interaction.reply(translate(lang, 'ping.pong', {
+  await interaction.editReply(translate(lang, 'ping.pong', {
     latency: Math.max(0, sentAt - interaction.createdTimestamp),
     ws: Number.isFinite(wsPing) ? wsPing : 'N/A'
   }));

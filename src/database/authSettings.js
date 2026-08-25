@@ -1,8 +1,10 @@
 import { pool } from './db.js';
+import { TtlCache } from '../utils/ttlCache.js';
 
 const DEFAULTS = {
   verified_role_id: null
 };
+const authSettingsCache = new TtlCache({ ttlMs: 300_000, maxEntries: 1_000 });
 
 export async function getAuthSettings(guildId) {
   const id = String(guildId || '').trim();
@@ -10,26 +12,28 @@ export async function getAuthSettings(guildId) {
     throw new Error('guildId is required');
   }
 
-  const result = await pool.query(
-    `SELECT
-      guild_id,
-      verified_role_id,
-      updated_at
-    FROM guild_auth_settings
-    WHERE guild_id = $1`,
-    [id]
-  );
+  return authSettingsCache.getOrLoad(id, async () => {
+    const result = await pool.query(
+      `SELECT
+        guild_id,
+        verified_role_id,
+        updated_at
+      FROM guild_auth_settings
+      WHERE guild_id = $1`,
+      [id]
+    );
 
-  const row = result.rows[0] || null;
-  if (!row) {
-    return { guild_id: id, ...DEFAULTS };
-  }
+    const row = result.rows[0] || null;
+    if (!row) {
+      return { guild_id: id, ...DEFAULTS };
+    }
 
-  return {
-    guild_id: row.guild_id,
-    verified_role_id: row.verified_role_id,
-    updated_at: row.updated_at
-  };
+    return {
+      guild_id: row.guild_id,
+      verified_role_id: row.verified_role_id,
+      updated_at: row.updated_at
+    };
+  });
 }
 
 export async function upsertAuthSettings(guildId, partialSettings) {
@@ -62,5 +66,6 @@ export async function upsertAuthSettings(guildId, partialSettings) {
     [id, merged.verified_role_id ? String(merged.verified_role_id) : null]
   );
 
+  authSettingsCache.set(id, result.rows[0]);
   return result.rows[0];
 }

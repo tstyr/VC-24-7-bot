@@ -5,6 +5,13 @@ const { Pool } = pg;
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  // Keep the pool small on the Koyeb free instance and fail fast when the
+  // remote database is unavailable instead of making Discord commands hang.
+  max: Math.max(1, Number(process.env.DB_POOL_MAX || 5)),
+  connectionTimeoutMillis: Math.max(1_000, Number(process.env.DB_CONNECT_TIMEOUT_MS || 5_000)),
+  idleTimeoutMillis: Math.max(1_000, Number(process.env.DB_IDLE_TIMEOUT_MS || 30_000)),
+  statement_timeout: Math.max(1_000, Number(process.env.DB_STATEMENT_TIMEOUT_MS || 15_000)),
+  keepAlive: true,
   ssl: {
     rejectUnauthorized: false
   }
@@ -15,8 +22,9 @@ pool.on('error', (err) => {
 });
 
 export async function testConnection() {
+  let client;
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
     await client.query('SELECT NOW()');
     
     // guild_settings テーブルを自動作成
@@ -282,11 +290,12 @@ export async function testConnection() {
       ON youtube_download_settings(user_id)
     `);
     
-    client.release();
     log('PostgreSQL接続成功', 'success');
     return true;
   } catch (error) {
     log(`PostgreSQL接続失敗: ${error.message}`, 'error');
     return false;
+  } finally {
+    client?.release();
   }
 }
