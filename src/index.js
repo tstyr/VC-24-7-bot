@@ -1,10 +1,11 @@
-import { Client, GatewayIntentBits, Collection, Partials } from 'discord.js';
-import { config } from 'dotenv';
+import 'dotenv/config';
+import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import { createServer } from 'http';
 import { MusicPlayer } from './music/player.js';
 import { testConnection } from './database/db.js';
 import { log } from './utils/logger.js';
-import { createMusicPanel } from './music/panel.js';
+import { getOsuApiQueueStats } from './utils/osuApi.js';
+import { createCommandCollection } from './commands/index.js';
 
 // イベントとコマンドのインポート
 import * as readyEvent from './events/ready.js';
@@ -12,44 +13,8 @@ import * as voiceStateUpdateEvent from './events/voiceStateUpdate.js';
 import * as interactionCreateEvent from './events/interactionCreate.js';
 import * as messageReactionAddEvent from './events/messageReactionAdd.js';
 import * as messageReactionRemoveEvent from './events/messageReactionRemove.js';
-import * as playCommand from './commands/play.js';
-import * as connectCommand from './commands/connect.js';
-import * as disconnectCommand from './commands/disconnect.js';
-import * as volumeCommand from './commands/volume.js';
-import * as authCommand from './commands/auth.js';
-import * as authAdminCommand from './commands/auth-admin.js';
-import * as authPanelCommand from './commands/auth-panel.js';
-import * as osuLinkCommand from './commands/osu-link.js';
-import * as osuDmCommand from './commands/osu-dm.js';
-import * as osuProfileCommand from './commands/osu-profile.js';
-import * as osuRecentCommand from './commands/osu-recent.js';
-import * as osuGrowthCommand from './commands/osu-growth.js';
-import * as osuRankingCommand from './commands/osu-ranking.js';
-import * as osuServerRankingCommand from './commands/osu-server-ranking.js';
-import * as osuRecruitCommand from './commands/osu-recruit.js';
-import * as osuRecruitAdminCommand from './commands/osu-recruit-admin.js';
-import * as osuGraphCommand from './commands/osu-graph.js';
-import * as osuGoalCommand from './commands/osu-goal.js';
-import * as osuAnalysisCommand from './commands/osu-analysis.js';
-import * as osuDashboardCommand from './commands/osu-dashboard.js';
-import * as osuHeatmapCommand from './commands/osu-heatmap.js';
-import * as osuTopplaysCommand from './commands/osu-topplays.js';
-import * as osuLeagueCommand from './commands/osu-league.js';
-import * as osuAdminCommand from './commands/osu-admin.js';
-import * as osuRoleSetupCommand from './commands/osu-role-setup.js';
-import * as notifyRoleSetupCommand from './commands/notify-role-setup.js';
-import * as notifyCommand from './commands/notify.js';
-import * as languageCommand from './commands/language.js';
-import * as cloneCategoryCommand from './commands/clone-category.js';
-import * as pingCommand from './commands/ping.js';
-import * as rolePanelCommand from './commands/role-panel.js';
-import * as timezoneCommand from './commands/timezone.js';
-import * as youtubeConfigCommand from './commands/youtube-config.js';
-import * as videoDownloadCommand from './commands/video-download.js';
 import { initDownloadDir, cleanupOldFiles } from './services/youtubeDownloader.js';
 import { checkR2Config } from './services/r2Storage.js';
-
-config();
 
 const client = new Client({
   intents: [
@@ -64,41 +29,7 @@ const client = new Client({
 });
 
 // コマンドとイベントの登録
-client.commands = new Collection();
-client.commands.set(playCommand.data.name, playCommand);
-client.commands.set(connectCommand.data.name, connectCommand);
-client.commands.set(disconnectCommand.data.name, disconnectCommand);
-client.commands.set(volumeCommand.data.name, volumeCommand);
-client.commands.set(authCommand.data.name, authCommand);
-client.commands.set(authAdminCommand.data.name, authAdminCommand);
-client.commands.set(authPanelCommand.data.name, authPanelCommand);
-client.commands.set(osuLinkCommand.data.name, osuLinkCommand);
-client.commands.set(osuDmCommand.data.name, osuDmCommand);
-client.commands.set(osuProfileCommand.data.name, osuProfileCommand);
-client.commands.set(osuRecentCommand.data.name, osuRecentCommand);
-client.commands.set(osuGrowthCommand.data.name, osuGrowthCommand);
-client.commands.set(osuRankingCommand.data.name, osuRankingCommand);
-client.commands.set(osuServerRankingCommand.data.name, osuServerRankingCommand);
-client.commands.set(osuRecruitCommand.data.name, osuRecruitCommand);
-client.commands.set(osuRecruitAdminCommand.data.name, osuRecruitAdminCommand);
-client.commands.set(osuGraphCommand.data.name, osuGraphCommand);
-client.commands.set(osuGoalCommand.data.name, osuGoalCommand);
-client.commands.set(osuAnalysisCommand.data.name, osuAnalysisCommand);
-client.commands.set(osuDashboardCommand.data.name, osuDashboardCommand);
-client.commands.set(osuHeatmapCommand.data.name, osuHeatmapCommand);
-client.commands.set(osuTopplaysCommand.data.name, osuTopplaysCommand);
-client.commands.set(osuLeagueCommand.data.name, osuLeagueCommand);
-client.commands.set(osuAdminCommand.data.name, osuAdminCommand);
-client.commands.set(osuRoleSetupCommand.data.name, osuRoleSetupCommand);
-client.commands.set(notifyRoleSetupCommand.data.name, notifyRoleSetupCommand);
-client.commands.set(notifyCommand.data.name, notifyCommand);
-client.commands.set(languageCommand.data.name, languageCommand);
-client.commands.set(cloneCategoryCommand.data.name, cloneCategoryCommand);
-client.commands.set(pingCommand.data.name, pingCommand);
-client.commands.set(rolePanelCommand.data.name, rolePanelCommand);
-client.commands.set(timezoneCommand.data.name, timezoneCommand);
-client.commands.set(youtubeConfigCommand.data.name, youtubeConfigCommand);
-client.commands.set(videoDownloadCommand.data.name, videoDownloadCommand);
+client.commands = createCommandCollection();
 
 // 音楽プレイヤー初期化
 client.musicPlayer = new MusicPlayer(client);
@@ -127,8 +58,13 @@ process.on('uncaughtException', (error) => {
 // ヘルスチェック用HTTPサーバー（Koyeb用）
 const server = createServer((req, res) => {
   if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('OK');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'ok',
+      ready: client.isReady(),
+      uptimeSeconds: Math.round(process.uptime()),
+      osuApi: getOsuApiQueueStats()
+    }));
   } else {
     res.writeHead(404);
     res.end();

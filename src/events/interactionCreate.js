@@ -3,6 +3,9 @@ import { MessageFlags } from 'discord.js';
 import { handleAuthModalSubmit, handleLanguageRoleSelect, handleModeRoleSelect, showAuthModal } from '../commands/auth.js';
 import { resolveUserLanguage, translate } from '../utils/i18n.js';
 import { log } from '../utils/logger.js';
+import { getOsuApiQueueStats } from '../utils/osuApi.js';
+
+const SLOW_COMMAND_MS = Math.max(500, Number(process.env.SLOW_COMMAND_MS || 3_000));
 
 export const name = 'interactionCreate';
 
@@ -11,6 +14,7 @@ export async function execute(interaction, client) {
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
+    const startedAt = Date.now();
 
     try {
       await command.execute(interaction, client.musicPlayer);
@@ -35,6 +39,16 @@ export async function execute(interaction, client) {
         }
       } catch (replyError) {
         log(`エラー応答の送信に失敗: ${replyError.message}`, 'error');
+      }
+    } finally {
+      const elapsedMs = Date.now() - startedAt;
+      if (elapsedMs >= SLOW_COMMAND_MS) {
+        const queue = getOsuApiQueueStats();
+        log(
+          `低速コマンド: /${interaction.commandName} ${elapsedMs}ms ` +
+          `(osu待機: interactive=${queue.interactive}, background=${queue.background})`,
+          'info'
+        );
       }
     }
     return;

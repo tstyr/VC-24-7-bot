@@ -95,7 +95,7 @@ export async function execute(interaction) {
       .setDescription(translate(lang, 'osuDashboard.description'))
       .setTimestamp(new Date());
 
-    for (const mode of MODES) {
+    const modeFields = await Promise.all(MODES.map(async mode => {
       try {
         const modeUser = await fetchOsuUser(baseUser.id, normalizeOsuMode(mode));
         const stats = modeUser.statistics || {};
@@ -123,7 +123,7 @@ export async function execute(interaction) {
             ? toFiniteNumber(stats.pp) - toFiniteNumber(snapshot.pp)
             : null;
 
-        embed.addFields({
+        return {
           name: `[${getModeLabel(mode)}]`,
           value: [
             `${translate(lang, 'osuDashboard.pp')}: ${formatNumber(stats.pp)}pp`,
@@ -132,15 +132,17 @@ export async function execute(interaction) {
             `${translate(lang, 'osuDashboard.rankDelta')}: ${formatRankDelta(snapshot?.global_rank, stats.global_rank)}`
           ].join('\n'),
           inline: true
-        });
+        };
       } catch {
-        embed.addFields({
+        return {
           name: `[${getModeLabel(mode)}]`,
           value: translate(lang, 'osuDashboard.unavailable'),
           inline: true
-        });
+        };
       }
-    }
+    }));
+
+    embed.addFields(...modeFields);
 
     if (baseUser.avatar_url) {
       embed.setThumbnail(baseUser.avatar_url);

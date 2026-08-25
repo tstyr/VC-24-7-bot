@@ -1131,7 +1131,10 @@ async function fetchRecentScoresForWindow(lookupTarget, mode, startMs, recentLim
 
   while (results.length < maxTotal) {
     const pageLimit = Math.min(perPage, maxTotal - results.length);
-    const page = await fetchRecentScores(lookupTarget, mode, pageLimit, { offset });
+    const page = await fetchRecentScores(lookupTarget, mode, pageLimit, {
+      offset,
+      priority: 'background'
+    });
     if (!Array.isArray(page) || page.length === 0) {
       break;
     }
@@ -1614,7 +1617,12 @@ async function sendMonthlySummaries({
         }
 
         try {
-          const scores = await fetchRecentScores(lookupTarget, mode, MONTHLY_SUMMARY_RECENT_LIMIT);
+          const scores = await fetchRecentScores(
+            lookupTarget,
+            mode,
+            MONTHLY_SUMMARY_RECENT_LIMIT,
+            { priority: 'background' }
+          );
           for (const score of scores || []) {
             const playedMs = new Date(score?.ended_at || score?.created_at).getTime();
             if (!Number.isFinite(playedMs) || playedMs < monthlyWindow.startMs || playedMs >= monthlyWindow.endMs) {
@@ -1826,7 +1834,7 @@ async function runCycle(client) {
         for (const mode of modes) {
           try {
             const lookupTarget = trackedOsuUserId !== null ? trackedOsuUserId : username;
-            const user = await fetchOsuUser(lookupTarget, mode);
+            const user = await fetchOsuUser(lookupTarget, mode, { priority: 'background' });
             const stats = user.statistics || {};
             const previous = await getLatestSnapshot({ osuUserId: user.id, mode });
 
@@ -1879,7 +1887,9 @@ async function runCycle(client) {
               milestoneCount += await sendToGuildAlertChannels(client, guildSettingsMap, discordId, milestoneEmbed);
             }
 
-            const [bestScore] = await fetchBestScores(user.id, mode, 1);
+            const [bestScore] = await fetchBestScores(user.id, mode, 1, {
+              priority: 'background'
+            });
             if (bestScore) {
               const previousBest = await getBestScoreRecord(user.id, mode);
               const currentBestPp = toFiniteNumber(bestScore.pp);

@@ -8,21 +8,21 @@
 - /auth - 認証を開始（ボタンでも実行可能）
 - /language lang:<ja|en> - 返信言語を設定（ユーザーごと）
 
-- /osu-link username:<osu名> - Discordとosu!を連携
-- /osu-profile [username] [mode] - プロフィール表示
-- /osu-recent [username] [mode] - 最新プレイ表示
-- /osu-growth [username] [mode] [baseline] [target_pp] - 成長率表示
-- /osu-ranking [period] [metric] [mode] [top] - サーバー内成長ランキング
-- /osu-server-ranking [metric] [mode] [top] - サーバー内現在ランキング
-- /osu-graph [mode] [span] [type] - グラフ表示
-- /osu-goal set|status|clear - 目標設定・確認
-- /osu-analysis [username] [mode] [limit] - プレイ分析
-- /osu-dashboard [username] - 4モードダッシュボード
-- /osu-heatmap [username] [mode] [span] - ベスト更新ヒートマップ
-- /osu-topplays [username] [mode] [limit] - Top Plays 変化追跡
-- /osu-league [period] [mode] [top] - フレンドリーグ
-- /osu-dm [enable] - 日次履歴DMの設定
-- /osu-recruit [mode] [text] [room_name] [room_link] - osu!募集
+- /osu link username:<osu名> - Discordとosu!を連携
+- /osu profile [username] [mode] - プロフィール表示
+- /osu recent [username] [mode] - 最新プレイ表示
+- /osu growth [username] [mode] [baseline] [target_pp] - 成長率表示
+- /osu ranking [period] [metric] [mode] [top] - サーバー内成長ランキング
+- /osu server-ranking [metric] [mode] [top] - サーバー内現在ランキング
+- /osu graph [username...] [mode] [chart] [metric] [span] - グラフ表示・比較
+- /osu goal set|status|clear - 目標設定・確認
+- /osu analysis [username] [mode] [limit] - プレイ分析
+- /osu dashboard [username] - 4モードダッシュボード
+- /osu heatmap [username] [mode] [span] - ベスト更新ヒートマップ
+- /osu topplays [username] [mode] [limit] - Top Plays 変化追跡
+- /osu league [period] [mode] [top] - フレンドリーグ
+- /osu dm [enable] - 日次履歴DMの設定
+- /osu recruit [mode] [text] [room_name] [room_link] - osu!募集
 - /osu-recruit-admin show|set-channel - 募集チャンネル設定（管理者）
 - /notify [mode] [text] - 募集通知
 - /notify-role-setup - 募集通知用ロール作成（管理者）
@@ -51,21 +51,21 @@
 - /auth - Start verification (also via panel button)
 - /language lang:<ja|en> - Set reply language per user
 
-- /osu-link username:<osu name> - Link Discord with osu!
-- /osu-profile [username] [mode] - Show profile
-- /osu-recent [username] [mode] - Show recent play
-- /osu-growth [username] [mode] [baseline] [target_pp] - Show growth
-- /osu-ranking [period] [metric] [mode] [top] - Server ranking
-- /osu-server-ranking [metric] [mode] [top] - Server current ranking
-- /osu-graph [mode] [span] [type] - Show graph
-- /osu-goal set|status|clear - Manage goals
-- /osu-analysis [username] [mode] [limit] - Play analysis
-- /osu-dashboard [username] - 4-mode dashboard
-- /osu-heatmap [username] [mode] [span] - Best play heatmap
-- /osu-topplays [username] [mode] [limit] - Top plays tracking
-- /osu-league [period] [mode] [top] - Friendly league
-- /osu-dm [enable] - Daily DM settings
-- /osu-recruit [mode] [text] [room_name] [room_link] - Post recruitment
+- /osu link username:<osu name> - Link Discord with osu!
+- /osu profile [username] [mode] - Show profile
+- /osu recent [username] [mode] - Show recent play
+- /osu growth [username] [mode] [baseline] [target_pp] - Show growth
+- /osu ranking [period] [metric] [mode] [top] - Server growth ranking
+- /osu server-ranking [metric] [mode] [top] - Server current ranking
+- /osu graph [usernames...] [mode] [chart] [metric] [span] - Show or compare graphs
+- /osu goal set|status|clear - Manage goals
+- /osu analysis [username] [mode] [limit] - Play analysis
+- /osu dashboard [username] - Four-mode dashboard
+- /osu heatmap [username] [mode] [span] - Best play heatmap
+- /osu topplays [username] [mode] [limit] - Top plays tracking
+- /osu league [period] [mode] [top] - Friendly league
+- /osu dm [enable] - Daily DM settings
+- /osu recruit [mode] [text] [room_name] [room_link] - Post recruitment
 - /osu-recruit-admin show|set-channel - Recruit channel settings (admin)
 - /notify [mode] [text] - Recruitment notify
 - /notify-role-setup - Create notify roles (admin)

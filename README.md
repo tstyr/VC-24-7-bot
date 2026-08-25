@@ -87,6 +87,9 @@ DATABASE_URL=postgresql://user:password@host:5432/database
 
 OSU_CLIENT_ID=your_osu_client_id
 OSU_CLIENT_SECRET=your_osu_client_secret
+OSU_API_MAX_CONCURRENCY=2
+OSU_API_TIMEOUT_MS=8000
+DB_POOL_MAX=5
 
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
@@ -168,12 +171,20 @@ http://localhost:3000 でアクセスできます。
 1. Discordサーバーでボイスチャンネルに参加
 2. `/connect`でボットをVCに参加させる（24時間VC運用時は不要）
 3. `/play`で音楽を再生
-4. `/osu-link` でosu!アカウントを連携
-5. 各種osu!コマンドを実行
-2. `/play 曲名` で音楽を検索
-3. Select Menuから曲を選択
-4. 操作パネルのボタンで再生をコントロール
-5. 通話ログは自動的にダッシュボードに保存されます
+4. `/osu link` でosu!アカウントを連携
+5. `/osu profile`、`/osu recent`、`/osu growth` などを実行
+6. Select Menuと操作パネルから音楽再生をコントロール
+7. 通話ログは自動的にダッシュボードへ保存されます
+
+全コマンドは [COMMANDS.md](COMMANDS.md) を参照してください。移行期間に旧 `/osu-*`
+コマンドも残す場合だけ、`ENABLE_LEGACY_OSU_COMMANDS=true` を設定します。
+
+## 応答速度とヘルスチェック
+
+- 定期収集・リアルタイム監視のosu! API処理は低優先度で実行され、Discordからのコマンドが先に処理されます。
+- 同じユーザーへの同時API要求と、言語・連携・ギルド設定の短時間の重複取得はプロセス内でまとめられます。
+- `/health` はDiscord接続状態、稼働時間、osu! API待ち行列数をJSONで返します。
+- 通常は `.env.example` の値で運用し、API制限が発生する場合は `OSU_API_MAX_CONCURRENCY` を `1` に下げてください。
 
 ## トラブルシューティング
 

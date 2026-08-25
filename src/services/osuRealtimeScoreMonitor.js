@@ -9,6 +9,13 @@ let isRunning = false;
 const processedScores = new Set();
 const userStatsCache = new Map(); // ユーザーごとの最新統計をキャッシュ
 const SCORE_CACHE_SIZE = 1000;
+const REALTIME_DEBUG = process.env.OSU_REALTIME_DEBUG === 'true';
+
+function debugLog(message) {
+  if (REALTIME_DEBUG) {
+    log(message, 'info');
+  }
+}
 
 function parseModes() {
   const raw = process.env.OSU_REALTIME_MODES || process.env.OSU_SNAPSHOT_MODES || 'osu';
@@ -83,7 +90,7 @@ function buildScoreEmbed({ user, mode, score, userStats, previousStats }) {
     log(`[リプレイURL無効化] user mismatch: expected ${expectedUserId}, got ${scoreUserId}, score=${scoreId}`, 'error');
   }
 
-  log(`[リプレイURL] Score ID: ${score?.id}, User ID: ${score?.user_id}, Mode: ${scoreMode}, URL: ${replayUrl}`, 'info');
+  debugLog(`[リプレイURL] Score ID: ${score?.id}, User ID: ${score?.user_id}, Mode: ${scoreMode}, URL: ${replayUrl}`);
   
   const pp = toFiniteNumber(score?.pp);
   const accuracy = toFiniteNumber(score?.accuracy);
@@ -119,7 +126,7 @@ function buildScoreEmbed({ user, mode, score, userStats, previousStats }) {
     }
   }
   
-  log(`[Embed生成] ${user.username} - 現在PP: ${currentPp}, 前回PP: ${previousPp}, 現在順位: ${currentRank}, 前回順位: ${previousRank}`, 'info');
+  debugLog(`[Embed生成] ${user.username} - 現在PP: ${currentPp}, 前回PP: ${previousPp}, 現在順位: ${currentRank}, 前回順位: ${previousRank}`);
   
   // リンク行を作成
   const links = [];
@@ -254,6 +261,14 @@ async function monitorCycle(client) {
       guildSettingsMap.set(guildId, settings);
     }
 
+    const hasDestinationChannel = [...guildSettingsMap.values()].some(
+      settings => settings.realtime_score_channel_id || settings.alert_channel_id
+    );
+    if (!hasDestinationChannel) {
+      debugLog('リアルタイム通知先が未設定のためAPI取得をスキップ');
+      return;
+    }
+
     let scoreCount = 0;
 
     for (const trackedUser of trackedUsers) {
@@ -262,17 +277,17 @@ async function monitorCycle(client) {
       let osuUsername = String(trackedUser.osu_username || '').trim();
 
       if (!discordId || !osuUsername) {
-        log(`スキップ: discordId=${discordId}, osuUsername="${osuUsername}"`, 'info');
+        debugLog(`スキップ: discordId=${discordId}, osuUsername="${osuUsername}"`);
         continue;
       }
 
-      log(`処理中: ${osuUsername} (ID: ${osuUserId || 'なし'})`, 'info');
+      debugLog(`処理中: ${osuUsername} (ID: ${osuUserId || 'なし'})`);
 
       // osuUserIdが0または無効な場合、ユーザー情報を再取得して更新
       if (!osuUserId || osuUserId === 0) {
         try {
-          log(`osu! ユーザーID取得試行: ${osuUsername}`, 'info');
-          const user = await fetchOsuUser(osuUsername, modes[0]);
+          debugLog(`osu! ユーザーID取得試行: ${osuUsername}`);
+          const user = await fetchOsuUser(osuUsername, modes[0], { priority: 'background' });
           osuUserId = user.id;
           osuUsername = user.username; // 正規化されたユーザー名を使用
           
@@ -294,7 +309,7 @@ async function monitorCycle(client) {
       for (const mode of modes) {
         try {
           // ユーザー情報を取得（統計情報含む）
-          const user = await fetchOsuUser(osuUserId, mode);
+          const user = await fetchOsuUser(osuUserId, mode, { priority: 'background' });
           const userStats = user.statistics || {};
           
           // キャッシュキー
@@ -303,8 +318,8 @@ async function monitorCycle(client) {
           // 前回キャッシュされた統計を取得
           const previousStats = userStatsCache.get(cacheKey) || null;
           
-          log(`[キャッシュ確認] ${cacheKey} - 前回PP: ${previousStats?.pp || 'なし'}, 前回順位: ${previousStats?.global_rank || 'なし'}`, 'info');
-          log(`[現在の統計] ${cacheKey} - 現在PP: ${userStats.pp}, 現在順位: ${userStats.global_rank}`, 'info');
+          debugLog(`[キャッシュ確認] ${cacheKey} - 前回PP: ${previousStats?.pp || 'なし'}, 前回順位: ${previousStats?.global_rank || 'なし'}`);
+          debugLog(`[現在の統計] ${cacheKey} - 現在PP: ${userStats.pp}, 現在順位: ${userStats.global_rank}`);
           
           // キャッシュがない場合は初期化（次回の比較用）
           if (!previousStats) {
@@ -312,18 +327,20 @@ async function monitorCycle(client) {
               pp: userStats.pp,
               global_rank: userStats.global_rank
             });
-            log(`[キャッシュ初期化] ${cacheKey} - PP: ${userStats.pp}, Rank: ${userStats.global_rank}`, 'info');
+            debugLog(`[キャッシュ初期化] ${cacheKey} - PP: ${userStats.pp}, Rank: ${userStats.global_rank}`);
           }
           
           // 最新5件のスコアを取得（ユーザーIDを使用）
-          const recentScores = await fetchRecentScores(osuUserId, mode, 5);
+          const recentScores = await fetchRecentScores(osuUserId, mode, 5, {
+            priority: 'background'
+          });
           
-          log(`[スコア取得] ${osuUsername} [${mode}] - ${recentScores.length}件のスコアを取得`, 'info');
+          debugLog(`[スコア取得] ${osuUsername} [${mode}] - ${recentScores.length}件のスコアを取得`);
           
           for (const score of recentScores) {
             const scoreKey = `${osuUserId}:${mode}:${score.id}`;
             
-            log(`[スコアチェック] Score ID: ${score.id}, Key: ${scoreKey}, 処理済み: ${processedScores.has(scoreKey)}`, 'info');
+            debugLog(`[スコアチェック] Score ID: ${score.id}, Key: ${scoreKey}, 処理済み: ${processedScores.has(scoreKey)}`);
             
             // スコアのユーザーIDが一致するか確認
             if (score.user_id && score.user_id !== osuUserId) {
@@ -341,11 +358,11 @@ async function monitorCycle(client) {
             const now = Date.now();
             const ageMinutes = Math.floor((now - scoreTime) / 60000);
             
-            log(`[スコア時刻] Score ID: ${score.id}, 経過時間: ${ageMinutes}分`, 'info');
+            debugLog(`[スコア時刻] Score ID: ${score.id}, 経過時間: ${ageMinutes}分`);
             
             if (now - scoreTime > 60 * 60 * 1000) {
               processedScores.add(scoreKey);
-              log(`[スコアスキップ] 古すぎるスコア (${ageMinutes}分前)`, 'info');
+              debugLog(`[スコアスキップ] 古すぎるスコア (${ageMinutes}分前)`);
               continue;
             }
 
@@ -360,7 +377,7 @@ async function monitorCycle(client) {
               previousStats
             });
 
-            log(`[スコア投稿準備] ${osuUsername} (ID: ${osuUserId}) - Score ID: ${score.id}, Score User ID: ${score.user_id}`, 'info');
+            debugLog(`[スコア投稿準備] ${osuUsername} (ID: ${osuUserId}) - Score ID: ${score.id}, Score User ID: ${score.user_id}`);
 
             const sent = await sendScoreToGuildChannels(
               client,
@@ -373,7 +390,7 @@ async function monitorCycle(client) {
               scoreCount += 1;
               log(`[スコア投稿成功] ${cacheKey} - Score ID: ${score.id}`, 'success');
             } else {
-              log(`[スコア投稿失敗] ${cacheKey} - チャンネルが見つからないか、ユーザーがメンバーではありません`, 'info');
+              debugLog(`[スコア投稿なし] ${cacheKey} - 対象チャンネルまたはメンバーなし`);
             }
 
             processedScores.add(scoreKey);
@@ -385,7 +402,7 @@ async function monitorCycle(client) {
             pp: userStats.pp,
             global_rank: userStats.global_rank
           });
-          log(`[キャッシュ更新] ${cacheKey} - PP: ${userStats.pp}, Rank: ${userStats.global_rank}`, 'success');
+          debugLog(`[キャッシュ更新] ${cacheKey} - PP: ${userStats.pp}, Rank: ${userStats.global_rank}`);
         } catch (error) {
           log(`osu! リアルタイムスコア取得失敗: ${osuUsername} [${mode}] - ${error.message}`, 'error');
           log(`エラー詳細: discordId=${discordId}, osuUserId=${osuUserId}, osuUsername=${osuUsername}`, 'error');
